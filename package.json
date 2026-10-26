@@ -1,0 +1,10 @@
+{
+  "name": "yapper-modbot-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Yapper moderation bot and authenticated web dashboard for Render",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node modbot.mjs", "check": "node --check modbot.mjs && node --check dashboard.mjs" },
+  "dependencies": { "express": "^4.21.2" }
+}

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: yapper-modbot-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NODE_ENV
+        value: production
+      - key: TOKEN
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: DASHBOARD_SECRET
+        generateValue: true
+      - key: MODBOT_DATA
+        value: ./modbot_data.json
