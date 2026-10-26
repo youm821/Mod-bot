@@ -705,10 +705,35 @@ command("modhelp", "modhelp", "List moderation commands", async (ctx) => {
 
 async function runCommand(ctx) {
   if (!ctx.content.startsWith(PREFIX)) return;
+
   const [name, rest] = takeToken(ctx.content.slice(PREFIX.length));
   const cmd = name && commands.get(name.toLowerCase());
-  if (!cmd) return; // unknown commands are ignored
+
+  if (!cmd) return; // Ignore unknown commands
+
   try {
+    // Commands everyone is allowed to use
+    const publicCommands = new Set(["help", "report"]);
+
+    // Commands that require moderator permissions
+    const staffUtilityCommands = new Set([
+      "ping",
+      "serverinfo",
+      "userinfo",
+      "poll"
+    ]);
+
+    // Block regular users from all commands except help and report.
+    if (!publicCommands.has(cmd.name)) {
+      if (!(await guard(ctx, "mod"))) return;
+    }
+
+    // Keep the additional permission check for utility commands
+    // if they require the existing moderator guard.
+    if (staffUtilityCommands.has(cmd.name)) {
+      if (!(await guard(ctx, "mod"))) return;
+    }
+
     await cmd.handler(ctx, rest);
   } catch (e) {
     if (e instanceof UsageError) {
