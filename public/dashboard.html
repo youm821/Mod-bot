@@ -1,58 +1,522 @@
+
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#10121b"><title>Yapper ModBot · Control Center</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10121b">
+<title>Yapper ModBot · Control Center</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0d14;--panel:#121621;--panel2:#171d2b;--line:#293145;--text:#f4f6ff;--muted:#9aa6bd;--accent:#9b8cff;--accent2:#72e2d0;--good:#6ee7b7;--warn:#ffce76;--bad:#ff8397;--shadow:0 18px 50px #0003}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 12% -8%,#29254e 0,transparent 34%),radial-gradient(ellipse at 100% 0,#123a3b33 0,transparent 30%),var(--bg);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}button,input,textarea,select{font:inherit}button{border:1px solid var(--line);background:#20283a;color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer;transition:.15s ease}button:hover{border-color:#9387ff;transform:translateY(-1px)}button:disabled{opacity:.5;cursor:not-allowed;transform:none}button.primary{background:linear-gradient(135deg,#a397ff,#7e8fff);color:#111322;border:0;font-weight:800}button.ghost{background:transparent}button.danger{color:#ffacb9;border-color:#60303d;background:#2b1822}input,textarea,select{width:100%;border:1px solid var(--line);background:#0d111b;color:var(--text);border-radius:10px;padding:10px 12px;outline:none}input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #9b8cff20}textarea{min-height:100px;resize:vertical}label{display:block;color:var(--muted);font-size:12px;font-weight:650;margin:12px 0 6px}.hidden{display:none!important}.shell{max-width:1600px;margin:auto;padding:22px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:12px}.logo{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#a397ff,#73e1d0);color:#10131e;font-size:24px;font-weight:1000;box-shadow:0 8px 30px #8d83ff28}.brand h1{font-size:18px;letter-spacing:-.4px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.top-actions{display:flex;align-items:center;gap:10px}.user-chip{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#151a27}.avatar{width:30px;height:30px;border-radius:10px;background:#323950;display:grid;place-items:center;font-weight:800;overflow:hidden}.avatar img{width:100%;height:100%;object-fit:cover}.layout{display:grid;grid-template-columns:255px minmax(0,1fr);gap:18px;align-items:start}.sidebar{position:sticky;top:16px;display:grid;gap:14px}.side-panel,.panel,.stat{background:linear-gradient(145deg,#141a27f5,#111621f5);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}.side-panel{padding:12px}.side-label{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:#77849e;font-weight:850;padding:8px 9px}.nav{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border-color:transparent;color:#b8c2d8;margin:2px 0;padding:10px}.nav .ico{width:25px;height:25px;border-radius:8px;display:grid;place-items:center;background:#20283a;color:#c8c1ff;font-size:14px}.nav.active{background:#292647;border-color:#47406f;color:#fff}.nav.active .ico{background:#a397ff;color:#171426}.server-list{display:grid;gap:5px}.server-item{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:9px;background:transparent;border-color:transparent;min-width:0}.server-item.selected{background:#1d2638;border-color:#38465f}.server-icon{width:34px;height:34px;border-radius:11px;flex:0 0 auto;background:#283047;display:grid;place-items:center;color:#c7c0ff;font-weight:850;overflow:hidden}.server-icon img{width:100%;height:100%;object-fit:cover}.server-name{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.server-sub{font-size:11px;color:var(--muted)}.main{min-width:0}.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:3px 0 18px}.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.6px;color:var(--accent2);font-weight:850}.page-head h2{font-size:27px;letter-spacing:-.8px;margin:4px 0 2px}.page-head p{color:var(--muted);margin:0}.head-actions{display:flex;gap:8px;flex-wrap:wrap}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat{padding:17px;min-width:0}.stat-top{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}.stat-icon{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:#282440;color:#c5bdff}.stat strong{display:block;font-size:28px;letter-spacing:-.9px;margin-top:11px}.stat small{color:var(--muted)}.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:14px}.panel{padding:18px;min-width:0}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.panel h3{font-size:15px;margin:0}.panel .hint{font-size:12px;color:var(--muted);margin-top:3px}.pill{border:1px solid var(--line);border-radius:99px;padding:4px 9px;color:var(--muted);font-size:11px;white-space:nowrap}.list{display:grid;gap:8px}.server-card{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);background:#101521;border-radius:13px;cursor:pointer}.server-card:hover{border-color:#7569bb}.server-card-main{min-width:0;flex:1}.server-card h4{margin:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.server-card p{margin:3px 0 0;color:var(--muted);font-size:11px}.server-card .arrow{font-size:20px;color:#7e8aa2}.quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.quick{padding:14px;border:1px solid var(--line);border-radius:13px;background:#101521;text-align:left}.quick strong{display:block;font-size:13px}.quick span{display:block;color:var(--muted);font-size:11px;margin-top:3px}.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:13px}.toolbar .search{flex:1;min-width:180px}.toolbar .search input{min-width:0}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}table{width:100%;border-collapse:collapse;min-width:660px}th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #242c3d;vertical-align:middle}th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8491aa;background:#151b28;position:sticky;top:0}td{font-size:12px;color:#dbe2f2}tr:last-child td{border-bottom:0}tbody tr:hover{background:#ffffff04}.member-cell{display:flex;align-items:center;gap:9px}.mini-avatar{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#283047;color:#d5d0ff;font-weight:800;overflow:hidden}.mini-avatar img{width:100%;height:100%;object-fit:cover}.member-name{font-weight:750}.muted{color:var(--muted)}.tag{display:inline-flex;border:1px solid #393d61;background:#25223e;color:#c7c0ff;border-radius:7px;padding:3px 7px;font-size:10px}.row-actions{display:flex;gap:5px}.small-btn{padding:6px 9px;font-size:11px;border-radius:8px}.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.field{margin-bottom:13px}.check-row{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--line);border-radius:11px;background:#101521}.check-row input{width:17px;height:17px}.check-row label{margin:0;color:var(--text);font-size:13px}.member-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px}.member-detail{position:sticky;top:16px;height:max-content}.profile-big{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px}.profile-big .mini-avatar{width:54px;height:54px;border-radius:16px;font-size:18px}.profile-big h3{margin:0;font-size:15px}.profile-big p{margin:3px 0 0;font-size:11px;color:var(--muted);overflow-wrap:anywhere}.role-list{display:grid;gap:7px;max-height:240px;overflow:auto}.role-check{display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:#0f1420}.role-check input{width:15px;height:15px}.role-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}.role-check span{font-size:12px;flex:1}.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.empty{padding:28px 18px;text-align:center;border:1px dashed #354058;border-radius:12px;color:var(--muted);font-size:12px}.empty strong{display:block;color:#dce3f2;font-size:13px;margin-bottom:4px}.toast{position:fixed;right:22px;bottom:22px;z-index:20;max-width:min(420px,calc(100vw - 40px));padding:13px 16px;border-radius:12px;background:#202b3d;border:1px solid #465571;box-shadow:var(--shadow)}.toast.error{border-color:#8d4252;background:#321d27}.login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}.login-card{width:min(440px,100%);padding:30px;border:1px solid var(--line);border-radius:23px;background:linear-gradient(145deg,#171c2b,#10141e);box-shadow:0 28px 100px #0006}.login-card .logo{width:56px;height:56px;margin-bottom:22px}.login-card h2{font-size:27px;letter-spacing:-.8px;margin:0 0 7px}.login-card p{color:var(--muted);margin:0 0 23px}.oauth-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;font-weight:800}.notice{border:1px solid #4a456e;background:#25213b;color:#d9d4ff;padding:11px 12px;border-radius:11px;font-size:11px;margin-top:16px}.footnote{font-size:11px;color:#76839a;margin-top:18px}.loading{color:var(--muted);padding:20px;text-align:center}.split{display:flex;gap:10px;align-items:center}.split>*{flex:1}.section{margin-bottom:16px}.divider{height:1px;background:var(--line);margin:15px 0}.mobile-menu{display:none}
+:root{color-scheme:dark;--bg:#0b0d14;--panel:#121621;--panel2:#171d2b;--line:#293145;--text:#f4f6ff;--muted:#9aa6bd;--accent:#9b8cff;--accent2:#72e2d0;--good:#6ee7b7;--warn:#ffce76;--bad:#ff8397;--shadow:0 18px 50px #0003}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 12% -8%,#29254e 0,transparent 34%),radial-gradient(ellipse at 100% 0,#123a3b33 0,transparent 30%),var(--bg);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+button,input,textarea,select{font:inherit}
+button{border:1px solid var(--line);background:#20283a;color:var(--text);border-radius:10px;padding:9px 13px;cursor:pointer;transition:.15s ease}
+button:hover{border-color:#9387ff;transform:translateY(-1px)}
+button:disabled{opacity:.5;cursor:not-allowed;transform:none}
+button.primary{background:linear-gradient(135deg,#a397ff,#7e8fff);color:#111322;border:0;font-weight:800}
+button.ghost{background:transparent}
+button.danger{color:#ffacb9;border-color:#60303d;background:#2b1822}
+input,textarea,select{width:100%;border:1px solid var(--line);background:#0d111b;color:var(--text);border-radius:10px;padding:10px 12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px #9b8cff20}
+textarea{min-height:100px;resize:vertical}
+label{display:block;color:var(--muted);font-size:12px;font-weight:650;margin:12px 0 6px}
+.hidden{display:none!important}
+.shell{max-width:1600px;margin:auto;padding:22px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(145deg,#a397ff,#73e1d0);color:#10131e;font-size:24px;font-weight:1000;box-shadow:0 8px 30px #8d83ff28}
+.brand h1{font-size:18px;letter-spacing:-.4px;margin:0}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}
+.top-actions{display:flex;align-items:center;gap:10px}
+.user-chip{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#151a27}
+.avatar{width:30px;height:30px;border-radius:10px;background:#323950;display:grid;place-items:center;font-weight:800;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.layout{display:grid;grid-template-columns:255px minmax(0,1fr);gap:18px;align-items:start}
+.sidebar{position:sticky;top:16px;display:grid;gap:14px}
+.side-panel,.panel,.stat{background:linear-gradient(145deg,#141a27f5,#111621f5);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}
+.side-panel{padding:12px}
+.side-label{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:#77849e;font-weight:850;padding:8px 9px}
+.nav{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:transparent;border-color:transparent;color:#b8c2d8;margin:2px 0;padding:10px}
+.nav .ico{width:25px;height:25px;border-radius:8px;display:grid;place-items:center;background:#20283a;color:#c8c1ff;font-size:14px}
+.nav.active{background:#292647;border-color:#47406f;color:#fff}
+.nav.active .ico{background:#a397ff;color:#171426}
+.server-list{display:grid;gap:5px}
+.server-item{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:9px;background:transparent;border-color:transparent;min-width:0}
+.server-item.selected{background:#1d2638;border-color:#38465f}
+.server-icon{width:34px;height:34px;border-radius:11px;flex:0 0 auto;background:#283047;display:grid;place-items:center;color:#c7c0ff;font-weight:850;overflow:hidden}
+.server-icon img{width:100%;height:100%;object-fit:cover}
+.server-name{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server-sub{font-size:11px;color:var(--muted)}
+.main{min-width:0}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:3px 0 18px}
+.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:1.6px;color:var(--accent2);font-weight:850}
+.page-head h2{font-size:27px;letter-spacing:-.8px;margin:4px 0 2px}
+.page-head p{color:var(--muted);margin:0}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stat{padding:17px;min-width:0}
+.stat-top{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}
+.stat-icon{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:#282440;color:#c5bdff}
+.stat strong{display:block;font-size:28px;letter-spacing:-.9px;margin-top:11px}
+.stat small{color:var(--muted)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:14px}
+.panel{padding:18px;min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.panel h3{font-size:15px;margin:0}
+.panel .hint{font-size:12px;color:var(--muted);margin-top:3px}
+.pill{border:1px solid var(--line);border-radius:99px;padding:4px 9px;color:var(--muted);font-size:11px;white-space:nowrap}
+.list{display:grid;gap:8px}
+.server-card{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);background:#101521;border-radius:13px;cursor:pointer}
+.server-card:hover{border-color:#7569bb}
+.server-card-main{min-width:0;flex:1}
+.server-card h4{margin:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server-card p{margin:3px 0 0;color:var(--muted);font-size:11px}
+.server-card .arrow{font-size:20px;color:#7e8aa2}
+.quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.quick{padding:14px;border:1px solid var(--line);border-radius:13px;background:#101521;text-align:left}
+.quick strong{display:block;font-size:13px}
+.quick span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:13px}
+.toolbar .search{flex:1;min-width:180px}
+.toolbar .search input{min-width:0}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:660px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid #242c3d;vertical-align:middle}
+th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8491aa;background:#151b28;position:sticky;top:0}
+td{font-size:12px;color:#dbe2f2}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#ffffff04}
+.member-cell{display:flex;align-items:center;gap:9px}
+.mini-avatar{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#283047;color:#d5d0ff;font-weight:800;overflow:hidden}
+.mini-avatar img{width:100%;height:100%;object-fit:cover}
+.member-name{font-weight:750}
+.muted{color:var(--muted)}
+.tag{display:inline-flex;border:1px solid #393d61;background:#25223e;color:#c7c0ff;border-radius:7px;padding:3px 7px;font-size:10px}
+.row-actions{display:flex;gap:5px}
+.small-btn{padding:6px 9px;font-size:11px;border-radius:8px}
+.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.field{margin-bottom:13px}
+.check-row{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--line);border-radius:11px;background:#101521}
+.check-row input{width:17px;height:17px}
+.check-row label{margin:0;color:var(--text);font-size:13px}
+.member-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px}
+.member-detail{position:sticky;top:16px;height:max-content}
+.profile-big{display:flex;align-items:center;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.profile-big .mini-avatar{width:54px;height:54px;border-radius:16px;font-size:18px}
+.profile-big h3{margin:0;font-size:15px}
+.profile-big p{margin:3px 0 0;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.role-list{display:grid;gap:7px;max-height:240px;overflow:auto}
+.role-check{display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:#0f1420}
+.role-check input{width:15px;height:15px}
+.role-dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.role-check span{font-size:12px;flex:1}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{padding:28px 18px;text-align:center;border:1px dashed #354058;border-radius:12px;color:var(--muted);font-size:12px}
+.empty strong{display:block;color:#dce3f2;font-size:13px;margin-bottom:4px}
+.toast{position:fixed;right:22px;bottom:22px;z-index:20;max-width:min(420px,calc(100vw - 40px));padding:13px 16px;border-radius:12px;background:#202b3d;border:1px solid #465571;box-shadow:var(--shadow)}
+.toast.error{border-color:#8d4252;background:#321d27}
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+.login-card{width:min(440px,100%);padding:30px;border:1px solid var(--line);border-radius:23px;background:linear-gradient(145deg,#171c2b,#10141e);box-shadow:0 28px 100px #0006}
+.login-card .logo{width:56px;height:56px;margin-bottom:22px}
+.login-card h2{font-size:27px;letter-spacing:-.8px;margin:0 0 7px}
+.login-card p{color:var(--muted);margin:0 0 23px}
+.oauth-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;font-weight:800}
+.notice{border:1px solid #4a456e;background:#25213b;color:#d9d4ff;padding:11px 12px;border-radius:11px;font-size:11px;margin-top:16px}
+.footnote{font-size:11px;color:#76839a;margin-top:18px}
+.loading{color:var(--muted);padding:20px;text-align:center}
+.split{display:flex;gap:10px;align-items:center}
+.split>*{flex:1}
+.section{margin-bottom:16px}
+.divider{height:1px;background:var(--line);margin:15px 0}
+.mobile-menu{display:none}
 @media(max-width:1050px){.layout{grid-template-columns:220px minmax(0,1fr)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.member-layout{grid-template-columns:minmax(0,1fr)}.member-detail{position:static}.grid2{grid-template-columns:1fr}}
 @media(max-width:720px){.shell{padding:13px}.layout{grid-template-columns:1fr}.sidebar{position:static}.server-panel{display:none}.side-panel.nav-panel{display:flex;gap:5px;overflow:auto}.side-label{display:none}.nav{width:auto;white-space:nowrap;padding:8px 10px}.nav .ico{display:none}.topbar{align-items:flex-start}.top-actions{gap:5px}.user-chip .username{display:none}.page-head{align-items:flex-start;flex-direction:column}.page-head h2{font-size:23px}.stats{gap:8px}.stat{padding:13px}.stat strong{font-size:24px}.settings-grid{grid-template-columns:1fr}.quick-grid{grid-template-columns:1fr 1fr}.panel{padding:13px}.top-actions #refresh{display:none}}
-</style></head>
+</style>
+</head>
 <body>
-<div id="login" class="login-wrap hidden"><div class="login-card"><div class="logo">Y</div><div class="eyebrow">Yapper moderation suite</div><h2>Welcome back.</h2><p>Sign in to your dashboard, then manage the Yapper servers your bot can access.</p><form id="loginForm"><label for="dashboardPassword">Dashboard password</label><input id="dashboardPassword" type="password" autocomplete="current-password" minlength="12" required placeholder="Enter your dashboard password"><button id="passwordLogin" class="primary oauth-btn" style="margin-top:12px" type="submit">Log in to dashboard</button></form><div id="loginError" class="notice hidden" role="alert"></div><div id="discordLoginWrap" class="hidden"><div class="divider"></div><button id="oauthLogin" class="oauth-btn" onclick="location.href='/auth/discord'"><span style="font-size:19px">◉</span> Continue with Discord</button></div><div class="notice">Yapper does not currently document user OAuth sign-in. The dashboard password signs you into this website; the bot connects to Yapper securely using the server-side TOKEN environment variable.</div><div class="footnote">Never paste your Yapper bot token into this login form.</div></div></div>
+
+<!-- Yapin' OAuth login -->
+<div id="login" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="logo">Y</div>
+    <div class="eyebrow">Yapper moderation suite</div>
+    <h2>Welcome back.</h2>
+    <p>Sign in with your Yapin’ account to manage your Yapper servers.</p>
+    <div id="loginError" class="notice hidden" role="alert"></div>
+    <button id="oauthLogin" class="oauth-btn primary" type="button">
+      <span style="font-size:19px">◉</span> Continue with Yapin’
+    </button>
+    <div class="notice">
+      Sign in securely with Yapin’. Your bot token stays on the server
+      and should never be entered on this page.
+    </div>
+    <div class="footnote">Access is controlled by the dashboard administrator.</div>
+  </div>
+</div>
+
 <div id="app" class="shell hidden">
-<header class="topbar"><div class="brand"><div class="logo">Y</div><div><h1>Yapper ModBot</h1><p>Moderation control center <span class="pill" style="margin-left:5px">LIVE PANEL</span></p></div></div><div class="top-actions"><span id="yapperConnection" class="pill">Yapper API: checking</span><button id="refresh" class="ghost">↻ Refresh</button><div class="user-chip"><div id="userAvatar" class="avatar">Y</div><span id="username" class="username">Admin</span></div><button id="logout" class="ghost">Sign out</button></div></header>
-<div class="layout"><aside class="sidebar"><div class="side-panel nav-panel"><div class="side-label">Workspace</div><button class="nav active" data-view="overview"><span class="ico">◫</span> Overview</button><button class="nav" data-view="members"><span class="ico">♙</span> Members</button><button class="nav" data-view="warnings"><span class="ico">⚑</span> Warnings</button><button class="nav" data-view="reports"><span class="ico">▤</span> Reports</button><button class="nav" data-view="settings"><span class="ico">⚙</span> AutoMod settings</button></div><div class="side-panel server-panel"><div class="side-label">Your bot's servers <span id="serverCount" class="pill" style="float:right">0</span></div><div id="serverList" class="server-list"><div class="loading">Loading servers…</div></div></div><div class="side-panel server-panel"><div class="side-label">Security</div><div class="muted" style="font-size:11px;padding:5px 9px 9px">OAuth allowlist enabled<br>Actions checked by Yapper API permissions</div></div></aside>
-<main class="main"><div class="page-head"><div><div class="eyebrow">Workspace / <span id="crumb">Overview</span></div><h2 id="heading">Overview</h2><p id="subheading">Your moderation activity at a glance.</p></div><div class="head-actions"><span id="selectedPill" class="pill">No server selected</span></div></div>
-<section id="view-overview"><div class="stats"><div class="stat"><div class="stat-top">Servers connected <span class="stat-icon">▦</span></div><strong id="totalServers">—</strong><small>Servers the bot can access</small></div><div class="stat"><div class="stat-top">Warnings tracked <span class="stat-icon">⚑</span></div><strong id="totalWarnings">—</strong><small>Saved moderation history</small></div><div class="stat"><div class="stat-top">Reports submitted <span class="stat-icon">▤</span></div><strong id="totalReports">—</strong><small>Across bot server records</small></div><div class="stat"><div class="stat-top">AutoMod rules <span class="stat-icon">✳</span></div><strong id="totalFilters">—</strong><small>Word filters + link controls</small></div></div><div class="grid2"><div class="panel"><div class="panel-head"><div><h3>Servers</h3><div class="hint">Choose a server to manage its members and settings.</div></div><span id="serverTotalPill" class="pill">0 connected</span></div><div id="overviewServers" class="list"><div class="loading">Loading…</div></div></div><div class="panel"><div class="panel-head"><div><h3>Quick actions</h3><div class="hint">Jump straight into common tools.</div></div></div><div class="quick-grid"><button class="quick" data-jump="members"><strong>♙ Manage members</strong><span>Find people, update nicknames and roles.</span></button><button class="quick" data-jump="warnings"><strong>⚑ Warning history</strong><span>Review case IDs and reasons.</span></button><button class="quick" data-jump="reports"><strong>▤ Review reports</strong><span>Check recent saved reports.</span></button><button class="quick" data-jump="settings"><strong>⚙ AutoMod setup</strong><span>Update filters and mod-log channel.</span></button></div><div class="divider"></div><div class="muted" style="font-size:11px">The bot only manages servers it has joined. Yapper enforces the bot's role permissions for moderation actions.</div></div></div></section>
-<section id="view-members" class="hidden"><div class="member-layout"><div class="panel"><div class="panel-head"><div><h3>Server members</h3><div id="memberCaption" class="hint">Select a server to load its members.</div></div><span id="memberCount" class="pill">0 loaded</span></div><div class="toolbar"><div class="search"><input id="memberSearch" placeholder="Search loaded members by name or ID…" autocomplete="off"></div><button id="loadMembers">Load / refresh</button><button id="loadMore" class="ghost hidden">Load more</button></div><div id="membersTable"><div class="empty"><strong>No server selected</strong>Select a server from the sidebar to browse members.</div></div></div><div id="memberDetail" class="panel member-detail"><div class="empty"><strong>Select a member</strong>Choose a member from the table to edit their profile, roles, or moderation status.</div></div></div></section>
+<header class="topbar">
+  <div class="brand"><div class="logo">Y</div><div><h1>Yapper ModBot</h1><p>Moderation control center <span class="pill" style="margin-left:5px">LIVE PANEL</span></p></div></div>
+  <div class="top-actions">
+    <span id="yapperConnection" class="pill">Yapper API: checking</span>
+    <button id="refresh" class="ghost">↻ Refresh</button>
+    <div class="user-chip"><div id="userAvatar" class="avatar">Y</div><span id="username" class="username">Admin</span></div>
+    <button id="logout" class="ghost">Sign out</button>
+  </div>
+</header>
+
+<div class="layout">
+<aside class="sidebar">
+  <div class="side-panel nav-panel">
+    <div class="side-label">Workspace</div>
+    <button class="nav active" data-view="overview"><span class="ico">◫</span> Overview</button>
+    <button class="nav" data-view="members"><span class="ico">♙</span> Members</button>
+    <button class="nav" data-view="warnings"><span class="ico">⚑</span> Warnings</button>
+    <button class="nav" data-view="reports"><span class="ico">▤</span> Reports</button>
+    <button class="nav" data-view="settings"><span class="ico">⚙</span> AutoMod settings</button>
+  </div>
+  <div class="side-panel server-panel">
+    <div class="side-label">Your bot's servers <span id="serverCount" class="pill" style="float:right">0</span></div>
+    <div id="serverList" class="server-list"><div class="loading">Loading servers…</div></div>
+  </div>
+  <div class="side-panel server-panel">
+    <div class="side-label">Security</div>
+    <div class="muted" style="font-size:11px;padding:5px 9px 9px">OAuth allowlist enabled<br>Actions checked by Yapper API permissions</div>
+  </div>
+</aside>
+
+<main class="main">
+<div class="page-head">
+  <div><div class="eyebrow">Workspace / <span id="crumb">Overview</span></div><h2 id="heading">Overview</h2><p id="subheading">Your moderation activity at a glance.</p></div>
+  <div class="head-actions"><span id="selectedPill" class="pill">No server selected</span></div>
+</div>
+
+<section id="view-overview">
+  <div class="stats">
+    <div class="stat"><div class="stat-top">Servers connected <span class="stat-icon">▦</span></div><strong id="totalServers">—</strong><small>Servers the bot can access</small></div>
+    <div class="stat"><div class="stat-top">Warnings tracked <span class="stat-icon">⚑</span></div><strong id="totalWarnings">—</strong><small>Saved moderation history</small></div>
+    <div class="stat"><div class="stat-top">Reports submitted <span class="stat-icon">▤</span></div><strong id="totalReports">—</strong><small>Across bot server records</small></div>
+    <div class="stat"><div class="stat-top">AutoMod rules <span class="stat-icon">✳</span></div><strong id="totalFilters">—</strong><small>Word filters + link controls</small></div>
+  </div>
+  <div class="grid2">
+    <div class="panel"><div class="panel-head"><div><h3>Servers</h3><div class="hint">Choose a server to manage its members and settings.</div></div><span id="serverTotalPill" class="pill">0 connected</span></div><div id="overviewServers" class="list"><div class="loading">Loading…</div></div></div>
+    <div class="panel"><div class="panel-head"><div><h3>Quick actions</h3><div class="hint">Jump straight into common tools.</div></div></div><div class="quick-grid">
+      <button class="quick" data-jump="members"><strong>♙ Manage members</strong><span>Find people, update nicknames and roles.</span></button>
+      <button class="quick" data-jump="warnings"><strong>⚑ Warning history</strong><span>Review case IDs and reasons.</span></button>
+      <button class="quick" data-jump="reports"><strong>▤ Review reports</strong><span>Check recent saved reports.</span></button>
+      <button class="quick" data-jump="settings"><strong>⚙ AutoMod setup</strong><span>Update filters and mod-log channel.</span></button>
+    </div><div class="divider"></div><div class="muted" style="font-size:11px">The bot only manages servers it has joined. Yapper enforces the bot's role permissions for moderation actions.</div></div>
+  </div>
+</section>
+
+<section id="view-members" class="hidden">
+  <div class="member-layout">
+    <div class="panel"><div class="panel-head"><div><h3>Server members</h3><div id="memberCaption" class="hint">Select a server to load its members.</div></div><span id="memberCount" class="pill">0 loaded</span></div>
+      <div class="toolbar"><div class="search"><input id="memberSearch" placeholder="Search loaded members by name or ID…" autocomplete="off"></div><button id="loadMembers">Load / refresh</button><button id="loadMore" class="ghost hidden">Load more</button></div>
+      <div id="membersTable"><div class="empty"><strong>No server selected</strong>Select a server from the sidebar to browse members.</div></div>
+    </div>
+    <div id="memberDetail" class="panel member-detail"><div class="empty"><strong>Select a member</strong>Choose a member from the table to edit their profile, roles, or moderation status.</div></div>
+  </div>
+</section>
+
 <section id="view-warnings" class="hidden"><div class="panel"><div class="panel-head"><div><h3>Warning history</h3><div class="hint">Latest cases recorded by this bot.</div></div><span id="warningCount" class="pill">0 cases</span></div><div id="warningsTable"><div class="empty">Choose a server to view warning history.</div></div></div></section>
+
 <section id="view-reports" class="hidden"><div class="panel"><div class="panel-head"><div><h3>Member reports</h3><div class="hint">Reports submitted through the bot's report command.</div></div><span id="reportCount" class="pill">0 reports</span></div><div id="reportsTable"><div class="empty">Choose a server to view reports.</div></div></div></section>
-<section id="view-settings" class="hidden"><div class="panel"><div class="panel-head"><div><h3>AutoMod settings</h3><div class="hint">These settings are saved in the bot's local JSON configuration.</div></div><span id="settingsServer" class="pill">No server selected</span></div><form id="settingsForm"><div class="settings-grid"><div><div class="field"><label for="bannedWords">Banned words / phrases</label><textarea id="bannedWords" placeholder="one phrase per line"></textarea><div class="hint">One phrase per line. Avoid adding common words accidentally.</div></div><div class="field"><label for="allowedDomains">Allowed link domains</label><textarea id="allowedDomains" placeholder="example.com&#10;docs.example.com"></textarea></div></div><div><div class="field"><label>Link protection</label><div class="check-row"><input id="blockLinks" type="checkbox"><label for="blockLinks">Block links unless the domain is allowed</label></div></div><div class="field"><label for="logChannel">Moderation log channel ID</label><input id="logChannel" placeholder="Paste a Yapper channel ID or leave blank"><div class="hint">Use the channel ID, not its display name.</div></div><div class="notice">Changes apply to the bot's configuration after saving. On Render, JSON files can be lost after restarts/redeploys on the free plan; see the README for durable hosting options.</div><div style="display:flex;gap:8px;margin-top:16px"><button class="primary" type="submit">Save settings</button><button type="button" id="reloadSettings">Reset form</button></div></div></div></form></div></section>
-</main></div></div><div id="toast" class="toast hidden"></div>
+
+<section id="view-settings" class="hidden">
+  <div class="panel"><div class="panel-head"><div><h3>AutoMod settings</h3><div class="hint">These settings are saved in the bot's local JSON configuration.</div></div><span id="settingsServer" class="pill">No server selected</span></div>
+    <form id="settingsForm"><div class="settings-grid">
+      <div><div class="field"><label for="bannedWords">Banned words / phrases</label><textarea id="bannedWords" placeholder="one phrase per line"></textarea><div class="hint">One phrase per line. Avoid adding common words accidentally.</div></div>
+      <div class="field"><label for="allowedDomains">Allowed link domains</label><textarea id="allowedDomains" placeholder="example.com&#10;docs.example.com"></textarea></div></div>
+      <div><div class="field"><label>Link protection</label><div class="check-row"><input id="blockLinks" type="checkbox"><label for="blockLinks">Block links unless the domain is allowed</label></div></div>
+      <div class="field"><label for="logChannel">Moderation log channel ID</label><input id="logChannel" placeholder="Paste a Yapper channel ID or leave blank"><div class="hint">Use the channel ID, not its display name.</div></div>
+      <div class="notice">Changes apply to the bot's configuration after saving. On Render, JSON files can be lost after restarts/redeploys on the free plan; see the README for durable hosting options.</div>
+      <div style="display:flex;gap:8px;margin-top:16px"><button class="primary" type="submit">Save settings</button><button type="button" id="reloadSettings">Reset form</button></div></div>
+    </div></form>
+  </div>
+</section>
+</main>
+</div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
 <script>
-const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];let overview=null,selectedServer=null,serverData=null,currentView='overview',members=[],memberCursor=null,memberHasMore=false,selectedMember=null,toastTimer=null;
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+let overview=null,selectedServer=null,serverData=null,currentView='overview',members=[],memberCursor=null,memberHasMore=false,selectedMember=null,toastTimer=null;
+
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function avatarUrl(path, bucket='icons'){if(!path)return '';return path.startsWith('/')?'https://www.yapper.website'+path:`https://files.yapper.website/${bucket}/${path}`}
-function img(path, cls='server-icon', bucket='icons', label='?'){const url=avatarUrl(path,bucket);return url?`<div class="${cls}"><img src="${esc(url)}" alt="" onerror="this.parentElement.textContent='?'"></div>`:`<div class="${cls}">${esc(String(label||'?').slice(0,1).toUpperCase())}</div>`}
+function avatarUrl(path,bucket='icons'){if(!path)return '';return path.startsWith('/')?'https://www.yapper.website'+path:`https://files.yapper.website/${bucket}/${path}`}
+function img(path,cls='server-icon',bucket='icons',label='?'){const url=avatarUrl(path,bucket);return url?`<div class="${cls}"><img src="${esc(url)}" alt="" onerror="this.parentElement.textContent='?'"></div>`:`<div class="${cls}">${esc(String(label||'?').slice(0,1).toUpperCase())}</div>`}
 function toast(message,error=false){const el=$('#toast');el.textContent=message;el.classList.toggle('error',error);el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),4200)}
-async function api(path,options={}){const res=await fetch(path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await res.json().catch(()=>({}));if(res.status===401){showLogin();throw new Error(data.error||'Please sign in again.')}if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);return data}
-function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
-function showApp(user){$('#login').classList.add('hidden');$('#app').classList.remove('hidden');if(user){$('#username').textContent=user.username||'Admin';$('#userAvatar').innerHTML=user.avatar?`<img src="${esc(user.avatar)}" alt="">`:esc((user.username||'Y').slice(0,1).toUpperCase())}checkYapperConnection()}
-async function checkYapperConnection(){const pill=$('#yapperConnection');pill.textContent='Yapper API: checking…';try{const status=await api('/api/yapper-status');pill.textContent=`Yapper API: connected · ${status.bot}`;pill.style.borderColor='#28664f';pill.style.color='#6ee7b7'}catch(e){pill.textContent='Yapper API: disconnected';pill.style.borderColor='#8d4252';pill.style.color='#ff8397'}}
-function nav(view){currentView=view;$$('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));['overview','members','warnings','reports','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!==view));const titles={overview:['Overview','Your moderation activity at a glance.'],members:['Members','Browse and edit people in a selected Yapper server.'],warnings:['Warning history','Case IDs, reasons, moderators, and dates.'],reports:['Reports','Recently submitted reports saved by the bot.'],settings:['AutoMod settings','Manage word filters, link blocking, and the mod-log channel.']};$('#heading').textContent=titles[view][0];$('#crumb').textContent=titles[view][0];$('#subheading').textContent=selectedServer?`${serverData?.server?.name||overview?.servers?.find(s=>s.id===selectedServer)?.name||'Selected server'} · ${selectedServer}`:titles[view][1];$('#selectedPill').textContent=selectedServer?(overview?.servers?.find(s=>s.id===selectedServer)?.name||selectedServer):'No server selected';}
-$$('.nav[data-view]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.view)));$$('[data-jump]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.jump)));
-function serverMarkup(s,card=false){const active=s.id===selectedServer;const image=img(s.icon_path,'server-icon','icons',s.name);if(card)return `<div class="server-card" data-server="${esc(s.id)}">${image}<div class="server-card-main"><h4>${esc(s.name)}</h4><p>${Number(s.member_count||0).toLocaleString()} members · ${s.warningCount} warnings · ${s.reportCount} reports</p></div><span class="arrow">›</span></div>`;return `<button class="server-item ${active?'selected':''}" data-server="${esc(s.id)}">${image}<span style="min-width:0;flex:1"><div class="server-name">${esc(s.name)}</div><div class="server-sub">${Number(s.member_count||0).toLocaleString()} members</div></span></button>`}
-function renderServers(){const list=overview?.servers||[];$('#serverCount').textContent=list.length;$('#serverTotalPill').textContent=`${list.length} connected`;$('#serverList').innerHTML=list.length?list.map(s=>serverMarkup(s)).join(''):'<div class="empty">No servers returned by Yapper. Make sure the bot has been added to a server.</div>';$('#overviewServers').innerHTML=list.length?list.map(s=>serverMarkup(s,true)).join(''):'<div class="empty"><strong>No servers yet</strong>Add the bot to a Yapper server first.</div>';$$('[data-server]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.server)));}
-async function loadOverview(){overview=await api('/api/overview');$('#totalServers').textContent=overview.totals.servers;$('#totalWarnings').textContent=overview.totals.warnings;$('#totalReports').textContent=overview.totals.reports;$('#totalFilters').textContent=overview.servers.reduce((n,s)=>n+s.bannedWords+(s.linkBlocking?1:0),0);renderServers();if(selectedServer&&!overview.servers.some(s=>s.id===selectedServer))selectedServer=null;if(!selectedServer&&overview.servers.length)selectedServer=overview.servers[0].id;if(selectedServer)await loadServer();else{serverData=null;renderWarnings();renderReports();nav(currentView)}renderServers();}
-async function selectServer(id){selectedServer=id;selectedMember=null;members=[];memberCursor=null;memberHasMore=false;renderServers();await loadServer();if(currentView==='members')await loadMembers(true);nav(currentView)}
-async function loadServer(){if(!selectedServer)return;try{serverData=await api('/api/servers/'+encodeURIComponent(selectedServer));fillSettings();renderWarnings();renderReports();$('#settingsServer').textContent=serverData.server.name;nav(currentView);if(currentView==='members')$('#memberCaption').textContent=`Members in ${serverData.server.name}. Search the loaded pages below.`;}catch(e){toast(e.message,true)}}
-function renderWarnings(){const list=serverData?.warnings||[];$('#warningCount').textContent=`${list.length} cases`;$('#warningsTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Case</th><th>User ID</th><th>Action</th><th>Reason</th><th>Moderator</th><th>Date</th></tr></thead><tbody>${list.map(w=>`<tr><td><span class="tag">${esc(w.caseId)}</span></td><td>${esc(w.userId)}</td><td>${esc(w.action)}</td><td>${esc(w.reason)}</td><td>${esc(w.moderator)}</td><td>${w.timestamp?new Date(w.timestamp*1000).toLocaleString():'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No warnings found</strong>No warning history has been saved for this server yet.</div>';}
-function renderReports(){const list=serverData?.reports||[];$('#reportCount').textContent=`${list.length} reports`;$('#reportsTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Reported user</th><th>Reporter</th><th>Reason</th><th>Submitted</th></tr></thead><tbody>${list.map(r=>`<tr><td>${esc(r.user_id)}</td><td>${esc(r.reporter_id)}</td><td>${esc(r.reason)}</td><td>${r.time?new Date(r.time*1000).toLocaleString():'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No reports found</strong>New reports submitted through the bot will appear here.</div>';}
-function fillSettings(){const s=serverData?.settings||{};$('#logChannel').value=s.log_channel||'';$('#blockLinks').checked=!!s.block_links;$('#bannedWords').value=(s.banned_words||[]).join('\n');$('#allowedDomains').value=(s.allowed_domains||[]).join('\n')}
-$('#settingsForm').addEventListener('submit',async e=>{e.preventDefault();if(!selectedServer)return toast('Select a server first.',true);const body={log_channel:$('#logChannel').value,block_links:$('#blockLinks').checked,banned_words:$('#bannedWords').value.split('\n').map(x=>x.trim()).filter(Boolean),allowed_domains:$('#allowedDomains').value.split('\n').map(x=>x.trim()).filter(Boolean)};try{await api('/api/servers/'+encodeURIComponent(selectedServer)+'/settings',{method:'PUT',body:JSON.stringify(body)});toast('AutoMod settings saved.');await loadOverview();await loadServer()}catch(e){toast(e.message,true)}});$('#reloadSettings').addEventListener('click',fillSettings);
-async function loadMembers(reset=false){if(!selectedServer)return toast('Select a server first.',true);if(reset){members=[];memberCursor=null;memberHasMore=false;selectedMember=null}$('#membersTable').innerHTML='<div class="loading">Loading members from Yapper…</div>';try{const params=new URLSearchParams({limit:'100'});if(memberCursor)params.set('after',memberCursor);const result=await api(`/api/servers/${encodeURIComponent(selectedServer)}/members?${params}`);members=reset?result.members:members.concat(result.members);memberCursor=result.nextAfter;memberHasMore=result.hasMore;$('#loadMore').classList.toggle('hidden',!memberHasMore);$('#memberCount').textContent=`${members.length} loaded`;$('#memberCaption').textContent=`Loaded ${members.length} members from ${serverData?.server?.name||'this server'}.`;renderMembers();}catch(e){$('#membersTable').innerHTML=`<div class="empty"><strong>Could not load members</strong>${esc(e.message)}</div>`;toast(e.message,true)}}
-function renderMembers(){const q=$('#memberSearch').value.trim().toLowerCase();const list=members.filter(m=>`${m.username} ${m.display_name} ${m.id}`.toLowerCase().includes(q));$('#membersTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Member</th><th>User ID</th><th>Roles</th><th>Timeout</th><th></th></tr></thead><tbody>${list.map(m=>`<tr><td><div class="member-cell">${img(m.avatar_path,'mini-avatar','avatars',m.display_name)}<div><div class="member-name">${esc(m.display_name)}</div><div class="muted">@${esc(m.username)}</div></div></div></td><td>${esc(m.id)}</td><td>${(m.role_ids||[]).length} roles</td><td>${m.timeout?'<span class="tag">Timed out</span>':'<span class="muted">—</span>'}</td><td><button class="small-btn" data-member="${esc(m.id)}">Manage</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No matching members</strong>Try a different name or user ID, or load another page.</div>';$$('[data-member]').forEach(b=>b.addEventListener('click',()=>openMember(b.dataset.member)));if(selectedMember){const m=members.find(x=>x.id===selectedMember);if(m)renderMemberDetail(m);else $('#memberDetail').innerHTML='<div class="empty">Select a member from the table.</div>'}}
-$('#memberSearch').addEventListener('input',renderMembers);$('#loadMembers').addEventListener('click',()=>loadMembers(true));$('#loadMore').addEventListener('click',()=>loadMembers(false));
-function openMember(id){selectedMember=id;const m=members.find(x=>x.id===id);if(m)renderMemberDetail(m)}
-function renderMemberDetail(m){const roles=serverData?.roles||[];$('#memberDetail').innerHTML=`<div class="profile-big">${img(m.avatar_path,'mini-avatar','avatars',m.display_name)}<div style="min-width:0"><h3>${esc(m.display_name)}</h3><p>${esc(m.id)}</p></div></div><form id="nicknameForm"><label for="nickname">Nickname</label><input id="nickname" maxlength="32" value="${esc(m.display_name===m.username?'':m.display_name)}" placeholder="Leave blank to clear"><button class="primary" style="margin-top:9px;width:100%" type="submit">Save nickname</button></form><div class="divider"></div><div class="panel-head"><div><h3>Roles</h3><div class="hint">Changes apply immediately.</div></div><span class="pill">${(m.role_ids||[]).length} assigned</span></div><div class="role-list">${roles.length?roles.map(r=>`<label class="role-check"><input type="checkbox" data-role="${esc(r.id)}" ${m.role_ids.includes(r.id)?'checked':''}><span class="role-dot" style="background:${/^#[0-9a-f]{6}$/i.test(r.color||'')?r.color:'#9b8cff'}"></span><span>${esc(r.name)}</span></label>`).join(''):'<div class="empty">No roles returned.</div>'}</div><div class="divider"></div><label for="timeoutMinutes">Timeout duration</label><div class="split"><select id="timeoutMinutes"><option value="10">10 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option><option value="10080">7 days</option><option value="40320">28 days</option><option value="0">Clear timeout</option></select><button id="applyTimeout" class="small-btn">Apply</button></div><label for="modReason">Reason (for timeout)</label><input id="modReason" maxlength="200" placeholder="Reason for action"><div class="divider"></div><div class="action-grid"><button id="kickMember" class="danger">Kick member</button><button id="banMember" class="danger">Ban member</button></div><p class="hint">Actions are subject to the bot's Yapper server permissions and hierarchy.</p>`;
-$('#nicknameForm').addEventListener('submit',async e=>{e.preventDefault();try{const nickname=$('#nickname').value.trim();await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/nickname`,{method:'PATCH',body:JSON.stringify({nickname})});m.display_name=nickname||m.username;toast('Nickname updated.');renderMembers()}catch(e){toast(e.message,true)}});
-$$('[data-role]').forEach(el=>el.addEventListener('change',async()=>{const roleId=el.dataset.role;el.disabled=true;try{const path=`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/roles/${encodeURIComponent(roleId)}`;await api(path,{method:el.checked?'PUT':'DELETE'});if(el.checked){if(!m.role_ids.includes(roleId))m.role_ids.push(roleId)}else m.role_ids=m.role_ids.filter(id=>id!==roleId);toast('Role updated.')}catch(e){el.checked=!el.checked;toast(e.message,true)}finally{el.disabled=false}}));
-$('#applyTimeout').addEventListener('click',async()=>{try{const minutes=Number($('#timeoutMinutes').value),reason=$('#modReason').value;await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/timeout`,{method:'POST',body:JSON.stringify({minutes,reason})});m.timeout=minutes?true:null;toast(minutes?'Timeout applied.':'Timeout cleared.');renderMembers()}catch(e){toast(e.message,true)}});
-$('#kickMember').addEventListener('click',async()=>{if(!confirm(`Kick ${m.display_name} from this server?`))return;try{await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/kick`,{method:'POST',body:'{}'});toast('Kick request completed.');members=members.filter(x=>x.id!==m.id);selectedMember=null;renderMembers();$('#memberDetail').innerHTML='<div class="empty"><strong>Member kicked</strong>Select another member.</div>'}catch(e){toast(e.message,true)}});
-$('#banMember').addEventListener('click',async()=>{if(!confirm(`Ban ${m.display_name} from this server? This is a moderation action.`))return;try{await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/ban`,{method:'POST',body:'{}'});toast('Ban request completed.');members=members.filter(x=>x.id!==m.id);selectedMember=null;renderMembers();$('#memberDetail').innerHTML='<div class="empty"><strong>Member banned</strong>Select another member.</div>'}catch(e){toast(e.message,true)}});
+
+async function api(path,options={}){
+  const res=await fetch(path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+  const data=await res.json().catch(()=>({}));
+  if(res.status===401){showLogin();throw new Error(data.error||'Please sign in again.')}
+  if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);
+  return data;
 }
-$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const button=$('#passwordLogin');const error=$('#loginError');button.disabled=true;error.classList.add('hidden');try{const res=await fetch('/api/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#dashboardPassword').value})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'Login failed.');$('#dashboardPassword').value='';showApp(data.user);await loadOverview();}catch(err){error.textContent=err.message;error.classList.remove('hidden')}finally{button.disabled=false}});
-$('#refresh').addEventListener('click',async()=>{try{await loadOverview();await checkYapperConnection();if(currentView==='members')await loadMembers(true);toast('Dashboard refreshed.')}catch(e){toast(e.message,true)}});$('#logout').addEventListener('click',async()=>{try{await api('/api/logout',{method:'POST',body:'{}'})}finally{showLogin()}});
-(async()=>{try{const me=await api('/api/me');$('#discordLoginWrap').classList.toggle('hidden',!me.loginOptions?.discord);if(!me.authenticated){showLogin();return}showApp(me.user);await loadOverview()}catch(e){showLogin()}})();
-</script></body></html>
+
+function showLogin(){$('#login').classList.remove('hidden');$('#app').classList.add('hidden')}
+function showApp(user){
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  if(user){
+    $('#username').textContent=user.username||user.display_name||'Admin';
+    $('#userAvatar').innerHTML=user.avatar_url||user.avatar
+      ?`<img src="${esc(user.avatar_url||user.avatar)}" alt="">`
+      :esc((user.username||user.display_name||'Y').slice(0,1).toUpperCase());
+  }
+  checkYapperConnection();
+}
+
+async function checkYapperConnection(){
+  const pill=$('#yapperConnection');
+  pill.textContent='Yapper API: checking…';
+  try{
+    const status=await api('/api/yapper-status');
+    pill.textContent=`Yapper API: connected · ${status.bot}`;
+    pill.style.borderColor='#28664f';
+    pill.style.color='#6ee7b7';
+  }catch(e){
+    pill.textContent='Yapper API: disconnected';
+    pill.style.borderColor='#8d4252';
+    pill.style.color='#ff8397';
+  }
+}
+
+function nav(view){
+  currentView=view;
+  $$('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  ['overview','members','warnings','reports','settings'].forEach(v=>$('#view-'+v).classList.toggle('hidden',v!==view));
+  const titles={
+    overview:['Overview','Your moderation activity at a glance.'],
+    members:['Members','Browse and edit people in a selected Yapper server.'],
+    warnings:['Warning history','Case IDs, reasons, moderators, and dates.'],
+    reports:['Reports','Recently submitted reports saved by the bot.'],
+    settings:['AutoMod settings','Manage word filters, link blocking, and the mod-log channel.']
+  };
+  $('#heading').textContent=titles[view][0];
+  $('#crumb').textContent=titles[view][0];
+  $('#subheading').textContent=selectedServer?`${serverData?.server?.name||overview?.servers?.find(s=>s.id===selectedServer)?.name||'Selected server'} · ${selectedServer}`:titles[view][1];
+  $('#selectedPill').textContent=selectedServer?(overview?.servers?.find(s=>s.id===selectedServer)?.name||selectedServer):'No server selected';
+}
+
+$$('.nav[data-view]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.view)));
+$$('[data-jump]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.jump)));
+
+function serverMarkup(s,card=false){
+  const active=s.id===selectedServer;
+  const image=img(s.icon_path,'server-icon','icons',s.name);
+  if(card)return `<div class="server-card" data-server="${esc(s.id)}">${image}<div class="server-card-main"><h4>${esc(s.name)}</h4><p>${Number(s.member_count||0).toLocaleString()} members · ${s.warningCount} warnings · ${s.reportCount} reports</p></div><span class="arrow">›</span></div>`;
+  return `<button class="server-item ${active?'selected':''}" data-server="${esc(s.id)}">${image}<span style="min-width:0;flex:1"><div class="server-name">${esc(s.name)}</div><div class="server-sub">${Number(s.member_count||0).toLocaleString()} members</div></span></button>`;
+}
+
+function renderServers(){
+  const list=overview?.servers||[];
+  $('#serverCount').textContent=list.length;
+  $('#serverTotalPill').textContent=`${list.length} connected`;
+  $('#serverList').innerHTML=list.length?list.map(s=>serverMarkup(s)).join(''):'<div class="empty">No servers returned by Yapper. Make sure the bot has been added to a server.</div>';
+  $('#overviewServers').innerHTML=list.length?list.map(s=>serverMarkup(s,true)).join(''):'<div class="empty"><strong>No servers yet</strong>Add the bot to a Yapper server first.</div>';
+  $$('[data-server]').forEach(b=>b.addEventListener('click',()=>selectServer(b.dataset.server)));
+}
+
+async function loadOverview(){
+  overview=await api('/api/overview');
+  $('#totalServers').textContent=overview.totals.servers;
+  $('#totalWarnings').textContent=overview.totals.warnings;
+  $('#totalReports').textContent=overview.totals.reports;
+  $('#totalFilters').textContent=overview.servers.reduce((n,s)=>n+s.bannedWords+(s.linkBlocking?1:0),0);
+  renderServers();
+  if(selectedServer&&!overview.servers.some(s=>s.id===selectedServer))selectedServer=null;
+  if(!selectedServer&&overview.servers.length)selectedServer=overview.servers[0].id;
+  if(selectedServer)await loadServer();
+  else{serverData=null;renderWarnings();renderReports();nav(currentView)}
+  renderServers();
+}
+
+async function selectServer(id){
+  selectedServer=id;selectedMember=null;members=[];memberCursor=null;memberHasMore=false;
+  renderServers();await loadServer();
+  if(currentView==='members')await loadMembers(true);
+  nav(currentView);
+}
+
+async function loadServer(){
+  if(!selectedServer)return;
+  try{
+    serverData=await api('/api/servers/'+encodeURIComponent(selectedServer));
+    fillSettings();renderWarnings();renderReports();
+    $('#settingsServer').textContent=serverData.server.name;
+    nav(currentView);
+    if(currentView==='members')$('#memberCaption').textContent=`Members in ${serverData.server.name}. Search the loaded pages below.`;
+  }catch(e){toast(e.message,true)}
+}
+
+function renderWarnings(){
+  const list=serverData?.warnings||[];
+  $('#warningCount').textContent=`${list.length} cases`;
+  $('#warningsTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Case</th><th>User ID</th><th>Action</th><th>Reason</th><th>Moderator</th><th>Date</th></tr></thead><tbody>${list.map(w=>`<tr><td><span class="tag">${esc(w.caseId)}</span></td><td>${esc(w.userId)}</td><td>${esc(w.action)}</td><td>${esc(w.reason)}</td><td>${esc(w.moderator)}</td><td>${w.timestamp?new Date(w.timestamp*1000).toLocaleString():'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No warnings found</strong>No warning history has been saved for this server yet.</div>';
+}
+
+function renderReports(){
+  const list=serverData?.reports||[];
+  $('#reportCount').textContent=`${list.length} reports`;
+  $('#reportsTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Reported user</th><th>Reporter</th><th>Reason</th><th>Submitted</th></tr></thead><tbody>${list.map(r=>`<tr><td>${esc(r.user_id)}</td><td>${esc(r.reporter_id)}</td><td>${esc(r.reason)}</td><td>${r.time?new Date(r.time*1000).toLocaleString():'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No reports found</strong>New reports submitted through the bot will appear here.</div>';
+}
+
+function fillSettings(){
+  const s=serverData?.settings||{};
+  $('#logChannel').value=s.log_channel||'';
+  $('#blockLinks').checked=!!s.block_links;
+  $('#bannedWords').value=(s.banned_words||[]).join('\n');
+  $('#allowedDomains').value=(s.allowed_domains||[]).join('\n');
+}
+
+$('#settingsForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!selectedServer)return toast('Select a server first.',true);
+  const body={
+    log_channel:$('#logChannel').value,
+    block_links:$('#blockLinks').checked,
+    banned_words:$('#bannedWords').value.split('\n').map(x=>x.trim()).filter(Boolean),
+    allowed_domains:$('#allowedDomains').value.split('\n').map(x=>x.trim()).filter(Boolean)
+  };
+  try{
+    await api('/api/servers/'+encodeURIComponent(selectedServer)+'/settings',{method:'PUT',body:JSON.stringify(body)});
+    toast('AutoMod settings saved.');
+    await loadOverview();await loadServer();
+  }catch(e){toast(e.message,true)}
+});
+$('#reloadSettings').addEventListener('click',fillSettings);
+
+async function loadMembers(reset=false){
+  if(!selectedServer)return toast('Select a server first.',true);
+  if(reset){members=[];memberCursor=null;memberHasMore=false;selectedMember=null}
+  $('#membersTable').innerHTML='<div class="loading">Loading members from Yapper…</div>';
+  try{
+    const params=new URLSearchParams({limit:'100'});
+    if(memberCursor)params.set('after',memberCursor);
+    const result=await api(`/api/servers/${encodeURIComponent(selectedServer)}/members?${params}`);
+    members=reset?result.members:members.concat(result.members);
+    memberCursor=result.nextAfter;memberHasMore=result.hasMore;
+    $('#loadMore').classList.toggle('hidden',!memberHasMore);
+    $('#memberCount').textContent=`${members.length} loaded`;
+    $('#memberCaption').textContent=`Loaded ${members.length} members from ${serverData?.server?.name||'this server'}.`;
+    renderMembers();
+  }catch(e){
+    $('#membersTable').innerHTML=`<div class="empty"><strong>Could not load members</strong>${esc(e.message)}</div>`;
+    toast(e.message,true);
+  }
+}
+
+function renderMembers(){
+  const q=$('#memberSearch').value.trim().toLowerCase();
+  const list=members.filter(m=>`${m.username} ${m.display_name} ${m.id}`.toLowerCase().includes(q));
+  $('#membersTable').innerHTML=list.length?`<div class="table-wrap"><table><thead><tr><th>Member</th><th>User ID</th><th>Roles</th><th>Timeout</th><th></th></tr></thead><tbody>${list.map(m=>`<tr><td><div class="member-cell">${img(m.avatar_path,'mini-avatar','avatars',m.display_name)}<div><div class="member-name">${esc(m.display_name)}</div><div class="muted">@${esc(m.username)}</div></div></div></td><td>${esc(m.id)}</td><td>${(m.role_ids||[]).length} roles</td><td>${m.timeout?'<span class="tag">Timed out</span>':'<span class="muted">—</span>'}</td><td><button class="small-btn" data-member="${esc(m.id)}">Manage</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty"><strong>No matching members</strong>Try a different name or user ID, or load another page.</div>';
+  $$('[data-member]').forEach(b=>b.addEventListener('click',()=>openMember(b.dataset.member)));
+  if(selectedMember){
+    const m=members.find(x=>x.id===selectedMember);
+    if(m)renderMemberDetail(m);
+    else $('#memberDetail').innerHTML='<div class="empty">Select a member from the table.</div>';
+  }
+}
+
+$('#memberSearch').addEventListener('input',renderMembers);
+$('#loadMembers').addEventListener('click',()=>loadMembers(true));
+$('#loadMore').addEventListener('click',()=>loadMembers(false));
+
+function openMember(id){selectedMember=id;const m=members.find(x=>x.id===id);if(m)renderMemberDetail(m)}
+
+function renderMemberDetail(m){
+  const roles=serverData?.roles||[];
+  $('#memberDetail').innerHTML=`<div class="profile-big">${img(m.avatar_path,'mini-avatar','avatars',m.display_name)}<div style="min-width:0"><h3>${esc(m.display_name)}</h3><p>${esc(m.id)}</p></div></div><form id="nicknameForm"><label for="nickname">Nickname</label><input id="nickname" maxlength="32" value="${esc(m.display_name===m.username?'':m.display_name)}" placeholder="Leave blank to clear"><button class="primary" style="margin-top:9px;width:100%" type="submit">Save nickname</button></form><div class="divider"></div><div class="panel-head"><div><h3>Roles</h3><div class="hint">Changes apply immediately.</div></div><span class="pill">${(m.role_ids||[]).length} assigned</span></div><div class="role-list">${roles.length?roles.map(r=>`<label class="role-check"><input type="checkbox" data-role="${esc(r.id)}" ${m.role_ids.includes(r.id)?'checked':''}><span class="role-dot" style="background:${/^#[0-9a-f]{6}$/i.test(r.color||'')?r.color:'#9b8cff'}"></span><span>${esc(r.name)}</span></label>`).join(''):'<div class="empty">No roles returned.</div>'}</div><div class="divider"></div><label for="timeoutMinutes">Timeout duration</label><div class="split"><select id="timeoutMinutes"><option value="10">10 minutes</option><option value="60">1 hour</option><option value="1440">1 day</option><option value="10080">7 days</option><option value="40320">28 days</option><option value="0">Clear timeout</option></select><button id="applyTimeout" class="small-btn">Apply</button></div><label for="modReason">Reason (for timeout)</label><input id="modReason" maxlength="200" placeholder="Reason for action"><div class="divider"></div><div class="action-grid"><button id="kickMember" class="danger">Kick member</button><button id="banMember" class="danger">Ban member</button></div><p class="hint">Actions are subject to the bot's Yapper server permissions and hierarchy.</p>`;
+
+  $('#nicknameForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    try{
+      const nickname=$('#nickname').value.trim();
+      await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/nickname`,{method:'PATCH',body:JSON.stringify({nickname})});
+      m.display_name=nickname||m.username;
+      toast('Nickname updated.');renderMembers();
+    }catch(e){toast(e.message,true)}
+  });
+
+  $$('[data-role]').forEach(el=>el.addEventListener('change',async()=>{
+    const roleId=el.dataset.role;el.disabled=true;
+    try{
+      const path=`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/roles/${encodeURIComponent(roleId)}`;
+      await api(path,{method:el.checked?'PUT':'DELETE'});
+      if(el.checked){if(!m.role_ids.includes(roleId))m.role_ids.push(roleId)}
+      else m.role_ids=m.role_ids.filter(id=>id!==roleId);
+      toast('Role updated.');
+    }catch(e){el.checked=!el.checked;toast(e.message,true)}
+    finally{el.disabled=false}
+  }));
+
+  $('#applyTimeout').addEventListener('click',async()=>{
+    try{
+      const minutes=Number($('#timeoutMinutes').value),reason=$('#modReason').value;
+      await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/timeout`,{method:'POST',body:JSON.stringify({minutes,reason})});
+      m.timeout=minutes?true:null;
+      toast(minutes?'Timeout applied.':'Timeout cleared.');renderMembers();
+    }catch(e){toast(e.message,true)}
+  });
+
+  $('#kickMember').addEventListener('click',async()=>{
+    if(!confirm(`Kick ${m.display_name} from this server?`))return;
+    try{
+      await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/kick`,{method:'POST',body:'{}'});
+      toast('Kick request completed.');members=members.filter(x=>x.id!==m.id);selectedMember=null;renderMembers();
+      $('#memberDetail').innerHTML='<div class="empty"><strong>Member kicked</strong>Select another member.</div>';
+    }catch(e){toast(e.message,true)}
+  });
+
+  $('#banMember').addEventListener('click',async()=>{
+    if(!confirm(`Ban ${m.display_name} from this server? This is a moderation action.`))return;
+    try{
+      await api(`/api/servers/${encodeURIComponent(selectedServer)}/members/${encodeURIComponent(m.id)}/ban`,{method:'POST',body:'{}'});
+      toast('Ban request completed.');members=members.filter(x=>x.id!==m.id);selectedMember=null;renderMembers();
+      $('#memberDetail').innerHTML='<div class="empty"><strong>Member banned</strong>Select another member.</div>';
+    }catch(e){toast(e.message,true)}
+  });
+}
+
+/* Yapin' OAuth: redirect to the server-side authorization route. */
+$('#oauthLogin').addEventListener('click',()=>{
+  window.location.href='/auth/yapin';
+});
+
+$('#refresh').addEventListener('click',async()=>{
+  try{
+    await loadOverview();await checkYapperConnection();
+    if(currentView==='members')await loadMembers(true);
+    toast('Dashboard refreshed.');
+  }catch(e){toast(e.message,true)}
+});
+
+$('#logout').addEventListener('click',async()=>{
+  try{await api('/api/logout',{method:'POST',body:'{}'})}
+  finally{showLogin()}
+});
+
+/* Check the server session when the dashboard loads. */
+(async()=>{
+  try{
+    const me=await api('/api/me');
+    if(!me.authenticated){
+      showLogin();
+      return;
+    }
+    showApp(me.user);
+    await loadOverview();
+  }catch(e){
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
