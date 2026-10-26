@@ -1,0 +1,5 @@
+node_modules/
+.env
+modbot_data.json
+modbot_data.json.tmp
+.DS_Store

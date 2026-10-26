@@ -13,9 +13,9 @@ services:
         value: production
       - key: TOKEN
         sync: false
-      - key: DASHBOARD_PASSWORD
-        sync: false
       - key: DASHBOARD_SECRET
         generateValue: true
+      - key: DASHBOARD_PASSWORD
+        sync: false
       - key: MODBOT_DATA
         value: ./modbot_data.json
