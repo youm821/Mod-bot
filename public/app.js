@@ -1,274 +1,255 @@
-"use strict";
-// All user-controlled text goes through textContent (see h()), so nothing here can inject HTML.
-const root = document.getElementById("app");
-const state = { user: null, botState: null, prefix: "!", server: null };
+// Yapper ModBot dashboard (no build step, no inline styles: works with the server's CSP)
+const root = document.getElementById("root");
+const S = { me: null, servers: [], gid: localStorage.getItem("ym_gid"), view: "home", srv: null, cache: {} };
 
-function h(tag, attrs, ...kids) {
-  const el = document.createElement(tag);
+// ---------- helpers
+function h(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (v == null || v === false) continue;
-    if (k === "class") el.className = v;
-    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-    else if (k === "value") el.value = v;
-    else if (k === "checked") el.checked = !!v;
-    else el.setAttribute(k, v === true ? "" : v);
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "value") e.value = v;
+    else e.setAttribute(k, v === true ? "" : v);
   }
-  for (const kid of kids.flat(Infinity)) {
-    if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return el;
+  for (const c of kids.flat(9)) if (c != null && c !== false) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
 }
-
-function toast(msg, bad) {
-  const t = h("div", { class: "toast" + (bad ? " bad" : "") }, msg);
-  document.getElementById("toasts").append(t);
-  setTimeout(() => t.remove(), 4500);
+const ICONS = {
+  home: '<path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.500-1-8-4-8-9V6z"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.900 4.900l2.100 2.100M17 17l2.100 2.100M4.900 19.100L7 17M17 7l2.100-2.100"/>',
+  warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
+  book: '<path d="M3 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h7z"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+};
+function icon(name) {
+  const s = h("span");
+  s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+  return s.firstChild;
 }
-
+let toastT;
+function toast(msg, err = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "show" + (err ? " err" : "");
+  clearTimeout(toastT); toastT = setTimeout(() => (t.className = ""), 3500);
+}
 async function api(method, path, body) {
-  const res = await fetch("/api" + path, {
-    method, credentials: "same-origin",
-    headers: body !== undefined ? { "Content-Type": "application/json" } : {},
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  let json = null;
-  try { json = await res.json(); } catch { /* empty */ }
-  if (res.status === 401) { state.user = null; if (path !== "/me") route(); throw new Error("Please log in."); }
-  if (!res.ok) throw new Error(json?.error || res.statusText);
-  return json;
+  const res = await fetch("/api" + path, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  let j = {}; try { j = await res.json(); } catch {}
+  if (res.status === 401) { S.me = null; renderLogin(); throw new Error("login"); }
+  if (!res.ok) throw new Error(j.error || "Something went wrong.");
+  return j;
 }
-// Runs an action, toasts the result/error.
-async function act(fn, okMsg) {
-  try { const r = await fn(); if (okMsg || r?.message) toast(okMsg || r.message); return r; }
-  catch (e) { toast(e.message, true); return null; }
+async function act(fn, ok) {
+  try { const r = await fn(); toast(r?.message || ok || "Saved."); return r; }
+  catch (e) { if (e.message !== "login") toast(e.message, true); return null; }
 }
+const ago = (t) => {
+  const s = Math.max(0, Date.now() / 1000 - t);
+  if (s < 60) return "just now"; if (s < 3600) return Math.floor(s / 60) + " min ago";
+  if (s < 86400) return Math.floor(s / 3600) + " h ago"; return Math.floor(s / 86400) + " d ago";
+};
+const fmtDate = (t) => new Date(t * 1000).toLocaleDateString(undefined, { day: "2-digit", month: "2-digit", year: "numeric" });
+const fmtTime = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const nameOf = (names, id) => (id ? names?.[id] || "User " + String(id).slice(0, 6) : "-");
+const initials = (s) => (s || "?").trim().slice(0, 2).toUpperCase();
+const canManage = () => S.srv?.level === "manage";
 
-const when = (s) => new Date(s * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-const who = (id, names) => (names?.[id] ? `${names[id]} (${id})` : id);
-
-// ---------------------------------------------------------------- layout
-function shell(content) {
-  const u = state.user;
-  return h("div", {},
-    h("header", { class: "top" },
-      h("a", { class: "brand", href: "#/" }, h("img", { src: "/favicon.svg", alt: "" }), "ModBot"),
-      h("a", { href: "#/commands", class: "small" }, "Commands"),
-      h("span", { class: "grow" }),
-      u && [
-        u.avatar && h("img", { class: "avatar", src: u.avatar, alt: "", referrerpolicy: "no-referrer" }),
-        h("span", { class: "name" }, u.displayName || u.username),
-        h("button", { class: "btn ghost sm", onclick: logout }, "Log out"),
-      ]),
-    h("main", { class: "wrap" },
-      state.botState && state.botState !== "online" && h("div", { class: "banner" }, `The bot is currently ${state.botState}. Settings can still be edited, but commands and auto-mod may not respond until it is online.`),
-      content));
+function sparkline(vals) {
+  const ns = "http://www.w3.org/2000/svg", w = 110, hgt = 34, max = Math.max(1, ...vals);
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("class", "spark"); svg.setAttribute("viewBox", `0 0 ${w} ${hgt}`);
+  const pts = vals.map((v, i) => [(i / (vals.length - 1)) * (w - 6) + 3, hgt - 4 - (v / max) * (hgt - 10)]);
+  const p = document.createElementNS(ns, "path");
+  p.setAttribute("d", pts.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" "));
+  p.setAttribute("fill", "none"); p.setAttribute("stroke", "#e8c27a"); p.setAttribute("stroke-width", "2.2"); p.setAttribute("stroke-linecap", "round"); p.setAttribute("stroke-linejoin", "round");
+  svg.append(p); return svg;
 }
-async function logout() { await fetch("/auth/logout", { method: "POST", credentials: "same-origin" }); state.user = null; route(); }
-
-function loginPage() {
-  const err = new URLSearchParams(location.search).get("login_error");
-  return h("div", { class: "login card" },
-    h("img", { src: "/favicon.svg", width: 56, height: 56, alt: "" }),
-    h("h2", {}, "ModBot Dashboard"),
-    h("p", { class: "muted" }, "Manage auto-mod, warnings and moderation for your Yapper servers."),
-    err && h("p", { class: "err" }, err),
-    h("a", { class: "btn", href: "/auth/login" }, "Log in with Yapin\u2019"),
-    h("p", { class: "muted small" }, "You can only manage servers where you are the owner or have a moderation role."));
-}
-
-// ---------------------------------------------------------------- pages
-async function serversPage() {
-  const view = h("div", {}, h("p", { class: "muted" }, "Loading servers\u2026"));
-  api("GET", "/servers").then(({ servers, botState }) => {
-    state.botState = botState;
-    view.replaceChildren(
-      h("h2", {}, "Your servers"),
-      servers.length
-        ? h("div", { class: "grid" }, servers.map((s) => h("a", { class: "card server", href: `#/s/${s.id}/overview` },
-            h("h3", {}, s.name), h("span", { class: "muted small" }, s.level === "manage" ? "Manager" : "Moderator"))))
-        : h("div", { class: "card" }, h("p", {}, "No servers found."),
-            h("p", { class: "muted small" }, "You need to be the owner (or have a Manage Messages / Manage Server role) in a server the bot is in. If the bot was just added, send any message in that server and refresh.")));
-  }).catch((e) => view.replaceChildren(h("p", { class: "err" }, e.message)));
-  return view;
-}
-
-const TABS = [["overview", "Overview"], ["settings", "Settings"], ["warnings", "Warnings"], ["actions", "Actions"], ["activity", "Activity"]];
-
-async function serverPage(id, tab) {
-  const view = h("div", {}, h("p", { class: "muted" }, "Loading\u2026"));
-  try {
-    const s = await api("GET", `/servers/${id}`);
-    state.server = s;
-    const body = h("div", {});
-    const pages = { overview, settings, warnings, actions, activity };
-    view.replaceChildren(
-      h("h2", {}, s.name),
-      h("nav", { class: "tabs" }, TABS.map(([k, label]) => h("a", { href: `#/s/${id}/${k}`, class: k === tab ? "on" : "" }, label))),
-      body);
-    await (pages[tab] ?? overview)(body, s);
-  } catch (e) { view.replaceChildren(h("p", { class: "err" }, e.message), h("a", { href: "#/" }, "\u2190 Back to servers")); }
-  return view;
-}
-
-function overview(body, s) {
-  const stat = (n, label) => h("div", { class: "card stat" }, h("b", {}, n), h("span", { class: "muted" }, label));
-  const on = (v) => (v ? "On" : "Off");
-  const esc = Object.entries(s.settings.escalation).sort((a, b) => a[0] - b[0]).map(([w, m]) => `${w} warnings \u2192 ${m} min`).join(", ") || "Off";
-  body.append(
-    h("div", { class: "stats" }, stat(s.stats.totalWarnings, "Total warnings"), stat(s.stats.warnedUsers, "Warned members"), stat(s.stats.bannedWords, "Banned words")),
-    h("div", { class: "card" }, h("h3", {}, "Auto-mod at a glance"),
-      h("table", {}, [
-        ["Banned words", on(s.settings.automod_words)],
-        ["Link blocking", `${on(s.block_links)} (${s.allowed_domains.length} allowed domains)`],
-        ["Spam", `${on(s.settings.automod_spam)} \u2013 ${s.settings.spam_messages} messages in ${s.settings.spam_seconds}s`],
-        ["Mass mentions", `${on(s.settings.automod_mentions)} \u2013 more than ${s.settings.max_mentions}`],
-        ["Escalation", esc],
-        ["Mod-log channel", s.log_channel ? `#${s.log_channel}` : "Not set"],
-      ].map(([k, v]) => h("tr", {}, h("td", { class: "muted" }, k), h("td", {}, v))))),
-    h("p", { class: "muted small" }, "Your role here: " + (s.level === "manage" ? "Manager (full access)" : "Moderator (warnings and timeouts)")));
-}
-
-async function settings(body, s) {
-  if (s.level !== "manage") return body.append(h("div", { class: "card" }, "Only server managers can change settings."));
-  const id = s.id;
-  const rerender = (fresh) => { state.server = fresh; body.replaceChildren(); settings(body, fresh); };
-  const save = async (patch) => { const r = await act(() => api("PATCH", `/servers/${id}/settings`, patch), "Saved."); if (r) rerender(r); };
-
-  // Auto-mod toggles
-  const toggle = (key, label, hint, value, isTop) => h("label", { class: "toggle" },
-    h("span", {}, h("b", {}, label), h("br"), h("span", { class: "muted small" }, hint)),
-    h("input", { type: "checkbox", checked: value, onchange: (e) => save({ [key]: e.target.checked }) }));
-  body.append(h("div", { class: "card" }, h("h3", {}, "Auto-mod"),
-    toggle("automod_words", "Banned words", "Delete messages that contain a banned word and warn the author.", s.settings.automod_words),
-    toggle("block_links", "Block links", "Delete messages with links, except allowed domains.", s.block_links),
-    toggle("automod_spam", "Spam", "Delete messages when someone sends too many too fast.", s.settings.automod_spam),
-    toggle("automod_mentions", "Mass mentions", "Delete messages that mention too many people.", s.settings.automod_mentions)));
-
-  // Thresholds
-  const spamN = h("input", { type: "number", min: 2, max: 30, value: s.settings.spam_messages });
-  const spamS = h("input", { type: "number", min: 2, max: 60, value: s.settings.spam_seconds });
-  const ment = h("input", { type: "number", min: 1, max: 50, value: s.settings.max_mentions });
-  body.append(h("div", { class: "card" }, h("h3", {}, "Limits"),
-    h("div", { class: "row" },
-      h("label", { class: "f" }, "Spam: messages", spamN),
-      h("label", { class: "f" }, "\u2026within seconds", spamS),
-      h("label", { class: "f" }, "Max mentions per message", ment),
-      h("button", { class: "btn", onclick: () => save({ spam_messages: +spamN.value, spam_seconds: +spamS.value, max_mentions: +ment.value }) }, "Save limits"))));
-
-  // Escalation
-  const rows = Object.entries(s.settings.escalation).map(([w, m]) => ({ warnings: +w, minutes: m }));
-  const escBox = h("div", {});
-  const drawEsc = () => {
-    escBox.replaceChildren(...rows.map((r, i) => h("div", { class: "row" },
-      h("label", { class: "f" }, "At warnings", h("input", { type: "number", min: 1, max: 50, value: r.warnings, oninput: (e) => (r.warnings = +e.target.value) })),
-      h("label", { class: "f" }, "Timeout (minutes)", h("input", { type: "number", min: 1, value: r.minutes, oninput: (e) => (r.minutes = +e.target.value) })),
-      h("button", { class: "btn ghost sm", onclick: () => { rows.splice(i, 1); drawEsc(); } }, "Remove"))));
-  };
-  drawEsc();
-  body.append(h("div", { class: "card" }, h("h3", {}, "Warning escalation"),
-    h("p", { class: "muted small" }, "Automatically time someone out when they reach this many warnings."), escBox,
-    h("div", { class: "row" },
-      h("button", { class: "btn ghost", onclick: () => { rows.push({ warnings: (rows.at(-1)?.warnings ?? 0) + 1, minutes: 10 }); drawEsc(); } }, "Add step"),
-      h("button", { class: "btn", onclick: () => save({ escalation: rows }) }, "Save escalation"))));
-
-  // Log channel
-  const ch = h("input", { type: "text", value: s.log_channel ?? "", placeholder: "Channel id or #mention (blank = off)" });
-  body.append(h("div", { class: "card" }, h("h3", {}, "Mod-log channel"),
-    h("p", { class: "muted small" }, "Warnings, timeouts and bans are posted here."),
-    h("div", { class: "row" }, h("label", {}, ch), h("button", { class: "btn", onclick: () => save({ log_channel: ch.value.trim() || null }) }, "Save"))));
-
-  // Lists
-  const listCard = (title, hint, items, path, placeholder, field) => {
-    const input = h("input", { type: "text", placeholder });
-    const add = async () => { if (!input.value.trim()) return; const r = await act(() => api("POST", `/servers/${id}/${path}`, { [field]: input.value }), "Added."); if (r) rerender(r); };
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
-    return h("div", { class: "card" }, h("h3", {}, title), h("p", { class: "muted small" }, hint),
-      h("div", { class: "row" }, h("label", {}, input), h("button", { class: "btn", onclick: add }, "Add")),
-      h("div", { class: "chips" }, items.length ? items.map((it) => h("span", { class: "chip" }, it,
-        h("button", { title: "Remove", onclick: async () => { const r = await act(() => api("DELETE", `/servers/${id}/${path}/${encodeURIComponent(it)}`), "Removed."); if (r) rerender(r); } }, "\u00d7")))
-        : h("span", { class: "muted small" }, "Nothing here yet.")));
-  };
-  body.append(
-    listCard("Banned words", "Matched as whole words, ignoring capitals.", s.banned_words ?? [], "words", "Add a word or phrase", "word"),
-    listCard("Allowed domains", "Only used when link blocking is on. Subdomains are included.", s.allowed_domains, "domains", "example.com", "domain"));
-}
-
-async function warnings(body, s) {
-  const id = s.id;
-  const draw = async () => {
-    const { users, names } = await api("GET", `/servers/${id}/warnings`);
-    const q = h("input", { type: "text", placeholder: "Search by name, id or reason" });
-    const list = h("div", {});
-    const paint = () => {
-      const term = q.value.trim().toLowerCase();
-      const shown = users.filter((u) => !term || u.id.includes(term) || (names[u.id] ?? "").toLowerCase().includes(term) || u.warnings.some((w) => w.reason.toLowerCase().includes(term)));
-      list.replaceChildren(...(shown.length ? shown.map((u) => h("details", { class: "card" },
-        h("summary", {}, h("b", {}, names[u.id] ?? u.id), " ", h("span", { class: "muted small" }, names[u.id] ? u.id : ""), " \u2013 ", `${u.warnings.length} warning(s)`),
-        h("table", {}, h("tr", {}, ["#", "Reason", "By", "When", ""].map((c) => h("th", {}, c))),
-          u.warnings.map((w, i) => h("tr", {}, h("td", {}, i + 1), h("td", {}, w.reason), h("td", {}, w.mod), h("td", { class: "small" }, when(w.time)),
-            h("td", {}, h("button", { class: "btn ghost sm", onclick: async () => { if (await act(() => api("DELETE", `/servers/${id}/warnings/${u.id}/${i + 1}`))) { body.replaceChildren(); warnings(body, s); } } }, "Remove"))))),
-        s.level === "manage" && h("div", { class: "row" }, h("button", { class: "btn danger sm", onclick: async () => { if (confirm("Clear all warnings for this member?") && await act(() => api("DELETE", `/servers/${id}/warnings/${u.id}`))) { body.replaceChildren(); warnings(body, s); } } }, "Clear all"))))
-        : [h("div", { class: "card muted" }, users.length ? "No matches." : "No one has been warned yet.")]));
-    };
-    q.addEventListener("input", paint);
-    paint();
-    body.append(h("div", { class: "row" }, h("label", {}, q)), h("div", { style: "height:12px" }), list);
-  };
-  const uid = h("input", { type: "text", placeholder: "User id or @mention" });
-  const reason = h("input", { type: "text", placeholder: "Reason (optional)" });
-  body.append(h("div", { class: "card" }, h("h3", {}, "Warn a member"),
-    h("div", { class: "row" }, h("label", { class: "f" }, "Member", uid), h("label", { class: "f" }, "Reason", reason),
-      h("button", { class: "btn", onclick: async () => { if (await act(() => api("POST", `/servers/${id}/warnings`, { userId: uid.value, reason: reason.value }))) { body.replaceChildren(); warnings(body, s); } } }, "Warn"))));
-  await draw();
-}
-
-function actions(body, s) {
-  const id = s.id;
-  const field = (label, ph, type = "text") => h("input", { type, placeholder: ph });
-  const form = (title, hint, fields, btn, run, danger) => h("div", { class: "card" }, h("h3", {}, title), h("p", { class: "muted small" }, hint),
-    h("div", { class: "row" }, fields.map(([l, el]) => h("label", { class: "f" }, l, el)),
-      h("button", { class: "btn" + (danger ? " danger" : ""), onclick: async () => { if (danger && !confirm(`${title}: are you sure?`)) return; if (await act(run)) fields.forEach(([, el]) => (el.value = "")); } }, btn)));
-  const tu = field("", "User id or @mention"), tm = field("", "10", "number"), tr = field("", "Reason (optional)");
-  body.append(form("Timeout a member", "Stops them from chatting for a while (1 minute to 7 days).",
-    [["Member", tu], ["Minutes", tm], ["Reason", tr]], "Timeout", () => api("POST", `/servers/${id}/timeout`, { userId: tu.value, minutes: tm.value, reason: tr.value })));
-  if (s.level !== "manage") return body.append(h("div", { class: "card muted" }, "Bans and unbans are for server managers."));
-  const bu = field("", "User id or @mention"), br = field("", "Reason (optional)"), uu = field("", "User id");
-  body.append(
-    form("Ban a member", "Removes them from the server.", [["Member", bu], ["Reason", br]], "Ban", () => api("POST", `/servers/${id}/ban`, { userId: bu.value, reason: br.value }), true),
-    form("Unban a user", "Use the user id of someone who was banned.", [["User id", uu]], "Unban", () => api("POST", `/servers/${id}/unban`, { userId: uu.value })));
-}
-
-async function activity(body, s) {
-  const { entries, names } = await api("GET", `/servers/${s.id}/activity`);
-  body.append(h("div", { class: "card" }, entries.length ? h("div", { style: "overflow-x:auto" }, h("table", {},
-    h("tr", {}, ["When", "Action", "Member", "By", "Details"].map((c) => h("th", {}, c))),
-    entries.map((e) => h("tr", {}, h("td", { class: "small" }, when(e.time)), h("td", {}, h("span", { class: `tag ${e.type}` }, e.type)),
-      h("td", {}, e.target ? who(e.target, names) : ""), h("td", {}, e.mod, e.source !== "chat" ? h("span", { class: "muted small" }, ` (${e.source})`) : ""), h("td", {}, e.reason ?? ""))))) : h("p", { class: "muted" }, "Nothing has happened yet.")));
-}
-
-async function commandsPage() {
-  const view = h("div", {}, h("p", { class: "muted" }, "Loading\u2026"));
-  api("GET", "/commands").then(({ prefix, labels, commands }) => {
-    view.replaceChildren(h("h2", {}, "Bot commands"), h("p", { class: "muted help" }, "Type these in any channel the bot can read. In chat, ", h("code", {}, `${prefix}help`), " shows only the commands you can use."),
-      ["all", "mod", "manage"].map((lvl) => h("div", { class: "card help" }, h("h3", {}, labels[lvl]),
-        h("table", {}, commands.filter((c) => c.level === lvl).map((c) => h("tr", {}, h("td", {}, h("code", {}, prefix + c.usage)), h("td", { class: "muted" }, c.description)))))));
-  }).catch((e) => view.replaceChildren(h("p", { class: "err" }, e.message)));
-  return view;
-}
-
-// ---------------------------------------------------------------- router
-async function route() {
-  if (!state.user) {
-    try { Object.assign(state, await api("GET", "/me")); } catch { /* not logged in */ }
+function perDay(entries, days, filter = () => true) {
+  const out = Array(days).fill(0), start = new Date(); start.setHours(0, 0, 0, 0);
+  for (const e of entries) {
+    if (!filter(e)) continue;
+    const d = days - 1 - Math.floor((start.getTime() + 86400000 - e.time * 1000) / 86400000);
+    if (d >= 0 && d < days) out[d]++;
   }
-  if (!state.user) return root.replaceChildren(loginPage());
-  const parts = location.hash.replace(/^#\/?/, "").split("/");
-  let page;
-  if (parts[0] === "s" && parts[1]) page = serverPage(parts[1], parts[2] || "overview");
-  else if (parts[0] === "commands") page = commandsPage();
-  else page = serversPage();
-  root.replaceChildren(shell(await page));
+  return out;
 }
-window.addEventListener("hashchange", route);
-route();
+
+// ---------- login
+function renderLogin() {
+  const err = new URLSearchParams(location.search).get("login_error");
+  root.replaceChildren(h("div", { class: "login" }, h("div", { class: "box" },
+    h("div", { class: "logo2" }, "R"),
+    h("h1", {}, "Yapper ModBot"),
+    h("p", {}, "Log in with your Yapin' account to manage warnings, auto-mod and moderation for your servers."),
+    err && h("div", { class: "err" }, err),
+    h("a", { class: "btn", href: "/auth/login" }, "Login with Yapin'"))));
+}
+
+// ---------- shell
+const NAV = [["home", "Home", "home"], ["moderate", "Moderate", "shield"], ["automod", "Auto-mod", "gear"], ["warnings", "Warnings", "warn"], ["commands", "Commands", "book"]];
+const TITLES = { home: "Home", moderate: "Moderate", automod: "Auto-mod", warnings: "Warnings", commands: "Commands" };
+
+function shell(compact, kpis, content) {
+  const u = S.me.user, nm = u.displayName || u.username;
+  const pick = h("select", { class: "pick", "aria-label": "Server", onchange: (e) => { S.gid = e.target.value; localStorage.setItem("ym_gid", S.gid); S.cache = {}; load(); } },
+    S.servers.length ? S.servers.map((s) => h("option", { value: s.id, selected: s.id === S.gid }, s.name)) : h("option", {}, "No servers yet"));
+  root.replaceChildren(h("div", { class: "app" },
+    h("aside", { class: "rail" }, h("div", { class: "logo" }, "R"),
+      h("nav", { class: "nav" }, NAV.map(([id, label, ic]) => h("button", { "aria-current": S.view === id ? "page" : null, "aria-label": label, onclick: () => { S.view = id; load(); } }, icon(ic), label)))),
+    h("div", { class: "main" },
+      h("div", { class: "band" + (compact ? " compact" : "") },
+        h("div", { class: "top" }, h("h1", {}, TITLES[S.view]), pick,
+          h("div", { class: "who" }, h("span", {}, h("span", { class: "dot " + S.me.botState }), "Bot " + S.me.botState),
+            h("div", { class: "av" }, u.avatar ? h("img", { src: u.avatar, alt: "" }) : initials(nm)), nm,
+            h("button", { onclick: async () => { await fetch("/auth/logout", { method: "POST" }); location.href = "/"; } }, "Log out"))),
+        kpis),
+      h("div", { class: "content" }, content))));
+}
+function kpi(title, big, sub, extra, hi) {
+  return h("div", { class: "kpi" + (hi ? " hi" : "") }, h("h3", {}, title), h("div", { class: "big" }, big), h("div", { class: "sub" }, sub), extra);
+}
+
+// ---------- data
+async function ensure(key, path) { return (S.cache[key] ??= await api("GET", path)); }
+const base = () => `/servers/${S.gid}`;
+async function refreshSrv() { S.srv = await api("GET", base()); delete S.cache.act; delete S.cache.warn; }
+
+async function load() {
+  try {
+    if (!S.me) S.me = await api("GET", "/me");
+    if (!S.servers.length) S.servers = (await api("GET", "/servers")).servers;
+    if (!S.servers.find((s) => s.id === S.gid)) S.gid = S.servers[0]?.id ?? null;
+    if (!S.gid) return shell(true, null, h("div", { class: "card" }, h("h2", {}, "No servers yet"),
+      h("p", { class: "hint" }, "A server shows up once the bot has seen a message there, and you need the Manage Messages permission in it. Send a message in your server, then reload.")));
+    localStorage.setItem("ym_gid", S.gid);
+    S.srv = await api("GET", base());
+    const views = { home: vHome, moderate: vModerate, automod: vAutomod, warnings: vWarnings, commands: vCommands };
+    await views[S.view]();
+  } catch (e) { if (e.message !== "login") { shell(true, null, h("div", { class: "card" }, h("h2", {}, "Couldn't load"), h("p", { class: "hint" }, e.message))); } }
+}
+
+// ---------- views
+const TYPE_LABEL = { warn: "WARN", unwarn: "UNWARN", timeout: "TIMEOUT", ban: "BAN", unban: "UNBAN", clearwarns: "CLEAR", addword: "WORD", delword: "WORD", links: "LINKS", allowdomain: "DOMAIN", setlog: "LOG", settings: "SET" };
+const badge = (t) => h("span", { class: "badge " + t }, TYPE_LABEL[t] || t.toUpperCase());
+
+async function vHome() {
+  const [act, warn] = await Promise.all([ensure("act", base() + "/activity"), ensure("warn", base() + "/warnings")]);
+  const s = S.srv, en = act.entries;
+  const week = perDay(en, 7), five = perDay(en, 5);
+  const days = Array.from({ length: 5 }, (_, i) => new Date(Date.now() - (4 - i) * 86400000).toLocaleDateString(undefined, { weekday: "short" }));
+  const mx = Math.max(1, ...five);
+  const bars = h("div", { class: "bars" }, five.map((v, i) => { const col = h("div", {}, h("i"), days[i]); col.firstChild.style.height = Math.max(4, (v / mx) * 78) + "%"; col.firstChild.title = v + " actions"; return col; }));
+  const kpis = h("div", { class: "kpis" },
+    kpi("Warned users", String(s.stats.warnedUsers), "Right now", sparkline(perDay(en, 7, (e) => e.type === "warn"))),
+    kpi("Total warnings", String(s.stats.totalWarnings), "Right now", sparkline(week), true),
+    h("div", { class: "kpi" }, h("h3", {}, "Actions, last 5 days"), bars),
+    kpi("Banned words", String(s.stats.bannedWords), s.level === "manage" ? "On the list" : "Managers only", sparkline(perDay(en, 7, (e) => e.type === "timeout"))),
+    kpi("Auto-mod", `${["automod_words", "automod_spam", "automod_mentions"].filter((k) => s.settings[k]).length}/3`, "Filters on", sparkline(perDay(en, 7, (e) => e.source === "automod"))));
+
+  const rows = en.slice(0, 6);
+  const table = h("div", { class: "card" }, h("h2", {}, "Latest actions"),
+    rows.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Type", "User", "By", "Reason", "Date", "Source"].map((c) => h("th", {}, c)))),
+      h("tbody", {}, rows.map((e) => h("tr", {}, h("td", {}, badge(e.type)), h("td", {}, nameOf(act.names, e.target)), h("td", {}, e.mod), h("td", { class: "reason", title: e.reason }, e.reason || "-"), h("td", {}, fmtDate(e.time)), h("td", {}, e.source || "chat")))))
+      : h("div", { class: "empty" }, "Nothing has happened yet. Warnings and timeouts will show up here."));
+
+  const on = ["Bad words", "Spam", "Mass mentions"].map((l, i) => [l, s.settings[["automod_words", "automod_spam", "automod_mentions"][i]]]);
+  const n = on.filter((x) => x[1]).length;
+  const cream = h("div", { class: "card cream" }, h("h2", {}, "Auto-mod"), h("div", { class: "count" }, `${n} of 3 filters on`),
+    h("div", { class: "gold" }, s.block_links ? "Links blocked" : "Links allowed"),
+    on.map(([l, v]) => h("p", {}, `${l}: ${v ? "on" : "off"}`)),
+    h("button", { class: "btn gold sm go", onclick: () => { S.view = "automod"; load(); } }, "Change settings"));
+
+  const top = warn.users.slice(0, 4);
+  const left = h("div", {}, h("h2", {}, "Most warned"),
+    top.length ? top.map((u) => h("div", { class: "person" }, h("div", { class: "av" }, initials(nameOf(warn.names, u.id))),
+      h("div", {}, h("b", {}, nameOf(warn.names, u.id)), h("span", {}, "Last: " + (u.warnings.at(-1)?.reason ?? "-"))), h("div", { class: "n" }, u.warnings.length)))
+      : h("p", { class: "hint" }, "Nobody has been warned. That's a quiet server."));
+  const right = h("div", {}, h("h2", {}, "Recent activity"), h("div", { class: "tl" },
+    en.slice(0, 4).map((e) => h("div", {}, h("time", {}, fmtTime(e.time), h("br"), ago(e.time)), h("i"), h("span", {}, `${e.type} ${e.target ? nameOf(act.names, e.target) : ""}`.trim()), h("em", {}, e.mod)))));
+  shell(false, kpis, [h("div", { class: "row" }, table, cream), h("div", { class: "bottom" }, left, right)]);
+}
+
+function userForm(title, hint, fields, btn, run, danger) {
+  const inputs = {};
+  const f = fields.map(([key, label, type, ph]) => { inputs[key] = h("input", { type: type || "text", placeholder: ph || "", min: type === "number" ? 1 : null }); return [h("label", {}, label), inputs[key]]; });
+  return h("div", { class: "card" }, h("h2", { class: "sm" }, title), h("p", { class: "hint" }, hint), f,
+    h("div", { class: "actions" }, h("button", { class: "btn", onclick: async (e) => {
+      if (danger && !confirm(danger)) return; e.target.disabled = true;
+      const r = await act(() => run(Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, v.value]))));
+      e.target.disabled = false; if (r) { for (const i of Object.values(inputs)) i.value = ""; await refreshSrv(); }
+    } }, btn)));
+}
+async function vModerate() {
+  const m = canManage();
+  const cards = [
+    userForm("Warn a member", "Adds a warning. Reaching an escalation step times them out automatically.", [["userId", "User id or @mention"], ["reason", "Reason", "text", "Optional"]], "Warn", (v) => api("POST", base() + "/warnings", v)),
+    userForm("Time out a member", "Stops them from chatting for a while.", [["userId", "User id or @mention"], ["minutes", "Minutes", "number", "10"], ["reason", "Reason", "text", "Optional"]], "Time out", (v) => api("POST", base() + "/timeout", v)),
+  ];
+  if (m) cards.push(
+    userForm("Ban a member", "Removes them from the server.", [["userId", "User id or @mention"], ["reason", "Reason", "text", "Optional"]], "Ban", (v) => api("POST", base() + "/ban", v), "Ban this member?"),
+    userForm("Unban a member", "Lets a banned member join again.", [["userId", "User id or @mention"]], "Unban", (v) => api("POST", base() + "/unban", v)));
+  shell(true, null, [h("div", { class: "grid2" }, cards), !m && h("p", { class: "hint" }, "Banning needs the Manage Server permission.")]);
+}
+
+async function vAutomod() {
+  const s = S.srv, m = canManage(), st = s.settings, dis = !m;
+  const sw = (key, title, desc, checked) => h("label", { class: "switch" }, h("span", {}, title, h("small", {}, desc)),
+    h("input", { type: "checkbox", checked, disabled: dis, onchange: (e) => patch({ [key]: e.target.checked }) }));
+  const patch = async (b) => { const r = await act(() => api("PATCH", base() + "/settings", b)); await refreshSrv(); await vAutomod(); return r; };
+  const num = (v, min, max) => h("input", { type: "number", value: v, min, max, disabled: dis });
+  const spamN = num(st.spam_messages, 2, 30), spamS = num(st.spam_seconds, 2, 60), menN = num(st.max_mentions, 1, 50);
+  const logI = h("input", { type: "text", value: s.log_channel ?? "", placeholder: "#channel or id", disabled: dis });
+  const esc = Object.entries(st.escalation).sort((a, b) => a[0] - b[0]).map(([w, mins]) => ({ w, mins }));
+  const escBox = h("div", {});
+  const drawEsc = () => escBox.replaceChildren(esc.map((r, i) => h("div", { class: "esc" },
+    h("input", { type: "number", min: 1, value: r.w, disabled: dis, "aria-label": "Warnings", oninput: (e) => (r.w = e.target.value) }),
+    h("input", { type: "number", min: 1, value: r.mins, disabled: dis, "aria-label": "Minutes", oninput: (e) => (r.mins = e.target.value) }),
+    !dis && h("button", { class: "iconbtn red", "aria-label": "Remove step", onclick: () => { esc.splice(i, 1); drawEsc(); } }, icon("trash")))),
+    !dis && h("button", { class: "btn ghost sm", onclick: () => { esc.push({ w: (esc.at(-1) ? +esc.at(-1).w : 0) + 1, mins: 10 }); drawEsc(); } }, "Add step"));
+  drawEsc();
+
+  const chips = (list, del) => h("div", { class: "chips" }, list.map((x) => h("span", { class: "chip" }, x, !dis && h("button", { "aria-label": "Remove " + x, onclick: () => del(x) }, "×"))));
+  const addRow = (ph, fn) => { const i = h("input", { type: "text", placeholder: ph }); return h("div", { class: "inline" }, i, h("button", { class: "btn sm", onclick: async () => { if (i.value.trim()) { await fn(i.value); } } }, "Add")); };
+  const wordsAdd = async (w) => { await act(() => api("POST", base() + "/words", { word: w })); await refreshSrv(); vAutomod(); };
+  const domAdd = async (d) => { await act(() => api("POST", base() + "/domains", { domain: d })); await refreshSrv(); vAutomod(); };
+
+  shell(true, null, [!m && h("p", { class: "hint" }, "You can view these settings. Changing them needs the Manage Server permission."),
+    h("div", { class: "grid2" },
+      h("div", { class: "card" }, h("h2", { class: "sm" }, "Filters"),
+        sw("automod_words", "Bad words", "Warn members who use words on your list.", st.automod_words),
+        sw("automod_spam", "Spam", "Warn members who send too many messages too fast.", st.automod_spam),
+        sw("automod_mentions", "Mass mentions", "Warn members who mention too many people.", st.automod_mentions),
+        sw("block_links", "Block links", "Delete links unless the domain is allowed.", s.block_links),
+        h("label", {}, "Spam: messages"), spamN, h("label", {}, "Spam: within seconds"), spamS, h("label", {}, "Mentions allowed per message"), menN,
+        h("div", { class: "actions" }, h("button", { class: "btn", disabled: dis, onclick: () => patch({ spam_messages: spamN.value, spam_seconds: spamS.value, max_mentions: menN.value }) }, "Save limits"))),
+      h("div", { class: "card" }, h("h2", { class: "sm" }, "Warning escalation"), h("p", { class: "hint" }, "When a member reaches this many warnings, they're timed out for this many minutes."),
+        escBox, !dis && h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => patch({ escalation: esc.map((r) => ({ warnings: r.w, minutes: r.mins })) }) }, "Save escalation")),
+        h("label", {}, "Mod log channel"), logI,
+        h("div", { class: "actions" }, h("button", { class: "btn ghost", disabled: dis, onclick: () => patch({ log_channel: logI.value }) }, "Save channel"))),
+      m && h("div", { class: "card" }, h("h2", { class: "sm" }, "Banned words"), s.banned_words.length ? chips(s.banned_words, async (w) => { await act(() => api("DELETE", base() + "/words/" + encodeURIComponent(w))); await refreshSrv(); vAutomod(); }) : h("p", { class: "hint" }, "No words yet."), addRow("Add a word or phrase", wordsAdd)),
+      h("div", { class: "card" }, h("h2", { class: "sm" }, "Allowed domains"), s.allowed_domains.length ? chips(s.allowed_domains, async (d) => { await act(() => api("DELETE", base() + "/domains/" + encodeURIComponent(d))); await refreshSrv(); vAutomod(); }) : h("p", { class: "hint" }, "No domains yet."), m && addRow("example.com", domAdd)))]);
+}
+
+async function vWarnings() {
+  const w = await ensure("warn", base() + "/warnings");
+  const rm = async (uid, i) => { await act(() => api("DELETE", `${base()}/warnings/${uid}/${i}`)); await refreshSrv(); vWarnings(); };
+  const clear = async (uid) => { if (!confirm("Clear all warnings for this member?")) return; await act(() => api("DELETE", `${base()}/warnings/${uid}`)); await refreshSrv(); vWarnings(); };
+  shell(true, null, h("div", { class: "card" }, h("h2", {}, "Members with warnings"),
+    w.users.length ? w.users.map((u) => h("details", { class: "user" },
+      h("summary", {}, h("div", { class: "av" }, initials(nameOf(w.names, u.id))), h("b", {}, nameOf(w.names, u.id)), h("span", { class: "badge warn" }, u.warnings.length + (u.warnings.length === 1 ? " warning" : " warnings"))),
+      h("div", { class: "wlist" }, u.warnings.map((x, i) => h("div", { class: "wl" }, h("span", {}, x.reason, " ", h("small", {}, `by ${x.mod} · ${ago(x.time)}`)),
+        h("button", { class: "iconbtn red", "aria-label": "Remove warning", onclick: () => rm(u.id, i) }, icon("trash")))),
+        canManage() && h("div", { class: "actions" }, h("button", { class: "btn ghost sm", onclick: () => clear(u.id) }, "Clear all")))))
+      : h("div", { class: "empty" }, "No warnings. Use Moderate to warn a member.")));
+}
+
+async function vCommands() {
+  const c = await ensure("cmd", "/commands");
+  shell(true, null, h("div", { class: "card" }, h("h2", {}, "Chat commands"), h("p", { class: "hint" }, `Type these in your server. Prefix: ${c.prefix}`),
+    h("table", {}, h("thead", {}, h("tr", {}, ["Command", "What it does", "Who", ""].map((x) => h("th", {}, x)))),
+      h("tbody", {}, c.commands.map((x) => h("tr", {}, h("td", {}, h("b", {}, c.prefix + x.name)), h("td", {}, x.description), h("td", {}, c.labels?.[x.level] ?? x.level), h("td", {}, h("code", {}, x.usage || ""))))))));
+}
+
+load().catch(() => {});
