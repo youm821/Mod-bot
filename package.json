@@ -1,15 +1,15 @@
 {
-  "name": "yapper-modbot-dashboard",
+  "name": "yapper-modbot",
   "version": "2.0.0",
-  "private": true,
+  "description": "Moderation bot for Yapper with a web dashboard (auto-mod, warnings, timeouts, bans)",
+  "main": "server.mjs",
   "type": "module",
-  "description": "Yapper moderation bot with OAuth-protected management dashboard",
-  "engines": { "node": ">=18" },
   "scripts": {
-    "start": "node modbot.mjs",
-    "check": "node --check modbot.mjs && node --check dashboard.mjs"
+    "start": "node server.mjs",
+    "bot-only": "node modbot.mjs"
   },
-  "dependencies": {
-    "express": "^4.21.2"
-  }
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
 }

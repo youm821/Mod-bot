@@ -21,7 +21,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { startDashboard } from "./dashboard.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +85,15 @@ function guildCfg(gid) {
   g.block_links ??= false;
   g.allowed_domains ??= [];
   g.warnings ??= {};
+  g.audit ??= [];
+  const s = (g.settings ??= {});
+  s.automod_words ??= true;
+  s.automod_spam ??= true;
+  s.automod_mentions ??= true;
+  s.spam_messages ??= SPAM_MESSAGES;
+  s.spam_seconds ??= SPAM_SECONDS;
+  s.max_mentions ??= MAX_MENTIONS;
+  s.escalation ??= { ...ESCALATION };
   return g;
 }
 
@@ -93,6 +101,14 @@ function save() {
   const tmp = DATA_FILE + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
   fs.renameSync(tmp, DATA_FILE);
+}
+
+/** Records an action for the dashboard's activity feed (last 200 per server). */
+function audit(gid, entry) {
+  const cfg = guildCfg(gid);
+  cfg.audit.push({ time: Math.floor(Date.now() / 1000), ...entry });
+  if (cfg.audit.length > 200) cfg.audit.splice(0, cfg.audit.length - 200);
+  save();
 }
 
 // --------------------------------------------------------------------------
@@ -248,23 +264,28 @@ async function guard(ctx, level) {
   return ok;
 }
 
-/** Returns the member to act on, or null (after replying why not). */
-async function resolveTarget(ctx, userId) {
-  if (userId === String(me.id)) { await ctx.reply("I can't moderate myself."); return null; }
-  if (userId === ctx.author.id) { await ctx.reply("You can't do that to yourself."); return null; }
+/** Checks whether `actor` may act on `userId`. Returns { target } or { error }. */
+async function checkTarget(guild, actor, userId, override = false) {
+  if (userId === String(me.id)) return { error: "I can't moderate myself." };
+  if (userId === actor.id) return { error: "You can't do that to yourself." };
   let target;
   try {
-    target = await getMember(ctx.guild, userId, true);
+    target = await getMember(guild, userId, true);
   } catch {
-    await ctx.reply("That user isn't in this server.");
-    return null;
+    return { error: "That user isn't in this server." };
   }
-  if (isOwner(target, ctx.guild)) { await ctx.reply("You can't moderate the server owner."); return null; }
-  if (canModerate(target, ctx.guild) && !isOwner(ctx.author, ctx.guild)) {
-    await ctx.reply("You can't moderate another moderator.");
-    return null;
+  if (isOwner(target, guild)) return { error: "You can't moderate the server owner." };
+  if (!override && canModerate(target, guild) && !isOwner(actor, guild)) {
+    return { error: "You can't moderate another moderator." };
   }
-  return target;
+  return { target };
+}
+
+/** Returns the member to act on, or null (after replying why not). */
+async function resolveTarget(ctx, userId) {
+  const r = await checkTarget(ctx.guild, ctx.author, userId);
+  if (r.error) { await ctx.reply(r.error); return null; }
+  return r.target;
 }
 
 // --------------------------------------------------------------------------
@@ -280,31 +301,78 @@ async function modLog(guild, text) {
   }
 }
 
-async function addWarning(guild, channelId, userId, reason, moderator) {
+async function addWarning(guild, channelId, userId, reason, moderator, source = "chat") {
   const cfg = guildCfg(guild.id);
   const warns = (cfg.warnings[userId] ??= []);
-  cfg.next_case_id ??= 1;
-  const caseId = `CASE-${String(cfg.next_case_id++).padStart(6, "0")}`;
-  warns.push({ case_id: caseId, action: "warn", reason, mod: moderator, time: Math.floor(Date.now() / 1000) });
+  warns.push({ reason, mod: moderator, time: Math.floor(Date.now() / 1000) });
   save();
   const count = warns.length;
+  audit(guild.id, { type: "warn", target: userId, mod: moderator, reason, source });
 
-  const msg = `<@${userId}> has been warned (${count} total). Case: ${caseId}. Reason: ${reason}`;
-  await send(channelId, msg);
-  await modLog(guild, `[warn] ${caseId} ${msg} - by ${moderator}`);
+  const msg = `<@${userId}> has been warned (${count} total). Reason: ${reason}`;
+  if (channelId) await send(channelId, msg);
+  await modLog(guild, `[warn] ${msg} - by ${moderator}`);
 
-  const minutes = ESCALATION[count];
+  const minutes = cfg.settings.escalation[count];
   if (minutes) {
     try {
       await doTimeout(guild.id, userId, minutes, `Reached ${count} warnings`);
       const note = `<@${userId}> was timed out for ${minutes} minutes (reached ${count} warnings).`;
-      await send(channelId, note);
+      audit(guild.id, { type: "timeout", target: userId, mod: "AutoMod", reason: `${minutes} min: reached ${count} warnings`, source: "automod" });
+      if (channelId) await send(channelId, note);
       await modLog(guild, `[timeout] ${note}`);
     } catch (e) {
       logErr("Auto-timeout failed:", e.message);
       await modLog(guild, `[error] Couldn't auto-timeout <@${userId}> at ${count} warnings.`);
     }
   }
+  return count;
+}
+
+async function timeoutUser(guild, actor, userId, minutes, reason, source = "chat") {
+  await doTimeout(guild.id, userId, minutes, reason);
+  const note = `<@${userId}> was timed out for ${minutes} minutes. Reason: ${reason}`;
+  audit(guild.id, { type: "timeout", target: userId, mod: actor, reason: `${minutes} min: ${reason}`, source });
+  await modLog(guild, `[timeout] ${note} - by ${actor}`);
+  return note;
+}
+
+async function banUser(guild, actor, target, reason, source = "chat") {
+  await doBan(guild.id, target.id);
+  const note = `${target.displayName} was banned. Reason: ${reason}`;
+  audit(guild.id, { type: "ban", target: target.id, mod: actor, reason, source });
+  await modLog(guild, `[ban] ${note} - by ${actor}`);
+  return note;
+}
+
+async function unbanUser(guild, actor, userId, source = "chat") {
+  await doUnban(guild.id, userId);
+  audit(guild.id, { type: "unban", target: userId, mod: actor, reason: "", source });
+  await modLog(guild, `[unban] ${userId} unbanned by ${actor}`);
+  return `Unbanned ${userId}.`;
+}
+
+async function clearWarnings(guild, actor, userId, source = "chat") {
+  const cfg = guildCfg(guild.id);
+  const n = (cfg.warnings[userId] ?? []).length;
+  delete cfg.warnings[userId];
+  save();
+  audit(guild.id, { type: "clearwarns", target: userId, mod: actor, reason: `${n} warning(s) cleared`, source });
+  await modLog(guild, `[clearwarns] <@${userId}> cleared by ${actor}`);
+  return n;
+}
+
+/** Removes warning number `index` (1-based). Returns the removed warning, or null. */
+async function removeWarning(guild, actor, userId, index, source = "chat") {
+  const cfg = guildCfg(guild.id);
+  const warns = cfg.warnings[userId] ?? [];
+  if (!Number.isInteger(index) || index < 1 || index > warns.length) return null;
+  const [removed] = warns.splice(index - 1, 1);
+  if (!warns.length) delete cfg.warnings[userId];
+  save();
+  audit(guild.id, { type: "unwarn", target: userId, mod: actor, reason: removed.reason, source });
+  await modLog(guild, `[unwarn] warning #${index} removed from <@${userId}> by ${actor}`);
+  return removed;
 }
 
 // --------------------------------------------------------------------------
@@ -333,21 +401,21 @@ function findBadLink(content, cfg) {
 }
 
 const recent = new Map();
-function isSpam(guildId, userId) {
+function isSpam(guildId, userId, limit = SPAM_MESSAGES, seconds = SPAM_SECONDS) {
   const key = `${guildId}:${userId}`;
   const now = Date.now();
   const q = recent.get(key) ?? [];
   q.push(now);
-  while (q.length > SPAM_MESSAGES) q.shift();
+  while (q.length > limit) q.shift();
   recent.set(key, q);
-  if (q.length >= SPAM_MESSAGES && now - q[0] <= SPAM_SECONDS * 1000) {
+  if (q.length >= limit && now - q[0] <= seconds * 1000) {
     recent.delete(key);
     return true;
   }
   return false;
 }
 setInterval(() => {
-  const cutoff = Date.now() - SPAM_SECONDS * 1000;
+  const cutoff = Date.now() - 60_000; // spam windows are capped at 60s
   for (const [k, q] of recent) if (q[q.length - 1] < cutoff) recent.delete(k);
 }, 60_000).unref();
 
@@ -358,14 +426,15 @@ async function automod(ctx) {
   const cfg = guildCfg(ctx.guild.id);
   const content = ctx.content;
 
+  const s = cfg.settings;
   let reason = null;
-  if (findBannedWord(content, cfg.banned_words)) {
+  if (s.automod_words && findBannedWord(content, cfg.banned_words)) {
     reason = "Used a banned word";
   } else {
     const host = findBadLink(content, cfg);
     if (host) reason = `Posted a link that isn't allowed (${host})`;
-    else if ((content.match(/<@/g) ?? []).length > MAX_MENTIONS) reason = "Mass mentioning";
-    else if (isSpam(ctx.guild.id, ctx.author.id)) reason = "Spamming";
+    else if (s.automod_mentions && (content.match(/<@/g) ?? []).length > s.max_mentions) reason = "Mass mentioning";
+    else if (s.automod_spam && isSpam(ctx.guild.id, ctx.author.id, s.spam_messages, s.spam_seconds)) reason = "Spamming";
   }
   if (reason === null) return true;
 
@@ -374,7 +443,7 @@ async function automod(ctx) {
   } catch (e) {
     logErr("Couldn't delete a message (does the bot have permission?):", e.message);
   }
-  await addWarning(ctx.guild, ctx.channelId, ctx.author.id, `[auto] ${reason}`, "AutoMod");
+  await addWarning(ctx.guild, ctx.channelId, ctx.author.id, `[auto] ${reason}`, "AutoMod", "automod");
   return false;
 }
 
@@ -415,116 +484,6 @@ function command(name, usage, description, handler) {
   commands.set(name, { name, usage, description, handler });
 }
 
-// Public utility and community commands
-command("help", "help", "Show the bot's command guide", async (ctx) => {
-  const p = PREFIX;
-  await ctx.reply(
-    "**Yapper ModBot — Help**\n\n" +
-    "**Everyone**\n" +
-    `${p}help — Show this menu\n` +
-    `${p}ping — Check whether the bot is responding\n` +
-    `${p}serverinfo — Show server information\n` +
-    `${p}userinfo [user] — Show member information\n` +
-    `${p}poll <question> | <option 1> | <option 2> — Format a poll\n` +
-    `${p}report <user> <reason> — Report a user to moderators\n\n` +
-    "**Moderators**\n" +
-    `${p}warn <user> [reason] — Warn a user\n` +
-    `${p}warnings <user> — View warnings\n` +
-    `${p}timeout <user> <minutes> [reason] — Timeout a user\n` +
-    `${p}modhelp — Show the full moderation command list\n\n` +
-    "**Server Managers**\n" +
-    `${p}ban <user> [reason] · ${p}unban <user id> · ${p}clearwarns <user>\n` +
-    `${p}addword <word> · ${p}delword <word> · ${p}words\n` +
-    `${p}links on|off · ${p}allowdomain <domain> · ${p}setlog <#channel>\n` +
-    `${p}announce <message> — Post a server announcement\n` +
-    `${p}modstats — View moderation statistics\n\n` +
-    "Commands with permission requirements can only be used by authorized staff."
-  );
-});
-
-command("ping", "ping", "Check whether the bot is responding", async (ctx) => {
-  const started = Date.now();
-  await ctx.reply(`Pong! 🏓\nMessage response: ${Date.now() - started} ms`);
-});
-
-command("serverinfo", "serverinfo", "Show server information", async (ctx) => {
-  const cfg = guildCfg(ctx.guild.id);
-  const memberCount = members.size; // only members currently cached by the bot
-  await ctx.reply(
-    `**Server Information**\n` +
-    `**Name:** ${ctx.guild.name}\n` +
-    `**Server ID:** ${ctx.guild.id}\n` +
-    `**Banned words configured:** ${cfg.banned_words.length}\n` +
-    `**Link blocking:** ${cfg.block_links ? "Enabled" : "Disabled"}\n` +
-    `**Mod-log:** ${cfg.log_channel ? `<#${cfg.log_channel}>` : "Not set"}\n` +
-    `**Members cached by bot:** ${memberCount} (not the total server count)`
-  );
-});
-
-command("userinfo", "userinfo [user]", "Show member information", async (ctx, rest) => {
-  const tok = takeToken(rest)[0];
-  const uid = tok ? parseId(tok) : ctx.author.id;
-  if (!uid) throw new UsageError();
-  let target;
-  try {
-    target = await getMember(ctx.guild, uid, true);
-  } catch {
-    return void (await ctx.reply("I couldn't find that member in this server."));
-  }
-  await ctx.reply(
-    `**Member Information**\n` +
-    `**Name:** ${target.displayName} (@${target.name})\n` +
-    `**User ID:** ${target.id}\n` +
-    `**Role count:** ${target.roleIds.length}\n` +
-    `**Warnings tracked:** ${(guildCfg(ctx.guild.id).warnings[target.id] ?? []).length}`
-  );
-});
-
-command("poll", "poll <question> | <option 1> | <option 2> [| option 3...]", "Format a simple poll", async (ctx, rest) => {
-  const parts = rest.split("|").map((s) => s.trim()).filter(Boolean);
-  if (parts.length < 3 || parts.length > 6) throw new UsageError();
-  const [question, ...options] = parts;
-  const marks = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
-  await ctx.reply(`**📊 Poll: ${question}**\n` + options.map((o, i) => `${marks[i]} ${o}`).join("\n") + "\n\nReply with the number of your choice. (This text poll does not collect votes automatically.)");
-});
-
-command("report", "report <user> <reason>", "Report a user to moderators", async (ctx, rest) => {
-  const [tok, reason] = takeToken(rest);
-  const uid = parseId(tok);
-  if (!uid || !reason.trim()) throw new UsageError();
-  if (uid === ctx.author.id) return void (await ctx.reply("You can't report yourself."));
-  const cfg = guildCfg(ctx.guild.id);
-  cfg.reports ??= [];
-  cfg.reports.push({ user_id: uid, reporter_id: ctx.author.id, reason: reason.trim().slice(0, 500), time: Math.floor(Date.now() / 1000) });
-  if (cfg.reports.length > 500) cfg.reports.splice(0, cfg.reports.length - 500);
-  save();
-  await ctx.reply("Your report has been saved for the moderation team.");
-  await modLog(ctx.guild, `[report] <@${uid}> reported by ${ctx.author.name} (<@${ctx.author.id}>): ${reason.trim().slice(0, 500)}`);
-});
-
-command("announce", "announce <message>", "Post a server announcement", async (ctx, rest) => {
-  if (!(await guard(ctx, "manage"))) return;
-  const message = rest.trim();
-  if (!message) throw new UsageError();
-  await ctx.reply(`📢 **Server Announcement**\n${message.slice(0, 1800)}\n\n— ${ctx.author.displayName}`);
-  await modLog(ctx.guild, `[announce] Posted by ${ctx.author.name}`);
-});
-
-command("modstats", "modstats", "Show moderation statistics", async (ctx) => {
-  if (!(await guard(ctx, "manage"))) return;
-  const cfg = guildCfg(ctx.guild.id);
-  const warningCount = Object.values(cfg.warnings).reduce((sum, list) => sum + list.length, 0);
-  await ctx.reply(
-    `**Moderation Statistics**\n` +
-    `**Tracked warnings:** ${warningCount}\n` +
-    `**Users with warnings:** ${Object.values(cfg.warnings).filter((list) => list.length > 0).length}\n` +
-    `**Banned words:** ${cfg.banned_words.length}\n` +
-    `**Saved reports:** ${(cfg.reports ?? []).length}\n` +
-    `**Link blocking:** ${cfg.block_links ? "Enabled" : "Disabled"}\n` +
-    `**Mod-log channel:** ${cfg.log_channel ? `<#${cfg.log_channel}>` : "Not configured"}`
-  );
-});
-
 command("warn", "warn <user> [reason]", "Warn a user", async (ctx, rest) => {
   if (!(await guard(ctx, "mod"))) return;
   const [tok, reason] = takeToken(rest);
@@ -554,10 +513,8 @@ command("clearwarns", "clearwarns <user>", "Clear all of a user's warnings", asy
   if (!(await guard(ctx, "manage"))) return;
   const uid = parseId(takeToken(rest)[0]);
   if (!uid) throw new UsageError();
-  delete guildCfg(ctx.guild.id).warnings[uid];
-  save();
+  await clearWarnings(ctx.guild, ctx.author.name, uid);
   await ctx.reply(`Cleared all warnings for <@${uid}>.`);
-  await modLog(ctx.guild, `[clearwarns] <@${uid}> cleared by ${ctx.author.name}`);
 });
 
 command("timeout", "timeout <user> <minutes> [reason]", "Time a user out", async (ctx, rest) => {
@@ -573,15 +530,14 @@ command("timeout", "timeout <user> <minutes> [reason]", "Time a user out", async
   const target = await resolveTarget(ctx, uid);
   if (!target) return;
   const why = reasonOf(reason);
+  let note;
   try {
-    await doTimeout(ctx.guild.id, target.id, minutes, why);
+    note = await timeoutUser(ctx.guild, ctx.author.name, target.id, minutes, why);
   } catch (e) {
     logErr("timeout failed:", e.message);
     return void (await ctx.reply(`Couldn't time them out: ${e.message}`));
   }
-  const note = `<@${target.id}> was timed out for ${minutes} minutes. Reason: ${why}`;
   await ctx.reply(note);
-  await modLog(ctx.guild, `[timeout] ${note} - by ${ctx.author.name}`);
 });
 
 command("ban", "ban <user> [reason]", "Ban a user", async (ctx, rest) => {
@@ -592,15 +548,14 @@ command("ban", "ban <user> [reason]", "Ban a user", async (ctx, rest) => {
   const target = await resolveTarget(ctx, uid);
   if (!target) return;
   const why = reasonOf(reason);
+  let note;
   try {
-    await doBan(ctx.guild.id, target.id);
+    note = await banUser(ctx.guild, ctx.author.name, target, why);
   } catch (e) {
     logErr("ban failed:", e.message);
     return void (await ctx.reply(`Couldn't ban them: ${e.message}`));
   }
-  const note = `${target.displayName} was banned. Reason: ${why}`;
   await ctx.reply(note);
-  await modLog(ctx.guild, `[ban] ${note} - by ${ctx.author.name}`);
 });
 
 command("unban", "unban <user id>", "Unban a user", async (ctx, rest) => {
@@ -608,13 +563,11 @@ command("unban", "unban <user id>", "Unban a user", async (ctx, rest) => {
   const uid = parseId(takeToken(rest)[0]);
   if (!uid) throw new UsageError();
   try {
-    await doUnban(ctx.guild.id, uid);
+    await ctx.reply(await unbanUser(ctx.guild, ctx.author.name, uid));
   } catch (e) {
     logErr("unban failed:", e.message);
-    return void (await ctx.reply(`Couldn't unban that user: ${e.message}`));
+    await ctx.reply(`Couldn't unban that user: ${e.message}`);
   }
-  await ctx.reply(`Unbanned ${uid}.`);
-  await modLog(ctx.guild, `[unban] ${uid} unbanned by ${ctx.author.name}`);
 });
 
 command("addword", "addword <word>", "Add a banned word", async (ctx, rest) => {
@@ -626,6 +579,7 @@ command("addword", "addword <word>", "Add a banned word", async (ctx, rest) => {
   if (!cfg.banned_words.includes(w)) {
     cfg.banned_words.push(w);
     save();
+    audit(ctx.guild.id, { type: "addword", target: "", mod: ctx.author.name, reason: "(word hidden)", source: "chat" });
   }
   await ctx.reply("Added to the banned word list.");
   try { await ctx.del(); } catch { /* don't leave the word sitting in chat */ }
@@ -640,6 +594,7 @@ command("delword", "delword <word>", "Remove a banned word", async (ctx, rest) =
   if (i === -1) return void (await ctx.reply("That word isn't on the list."));
   cfg.banned_words.splice(i, 1);
   save();
+  audit(ctx.guild.id, { type: "delword", target: "", mod: ctx.author.name, reason: "(word hidden)", source: "chat" });
   await ctx.reply("Removed from the banned word list.");
 });
 
@@ -655,6 +610,7 @@ command("links", "links on|off", "Turn link blocking on or off", async (ctx, res
   if (on === null) throw new UsageError();
   guildCfg(ctx.guild.id).block_links = on;
   save();
+  audit(ctx.guild.id, { type: "links", target: "", mod: ctx.author.name, reason: `Link blocking ${on ? "on" : "off"}`, source: "chat" });
   await ctx.reply(`Link blocking is now ${on ? "ON" : "OFF"}.`);
 });
 
@@ -667,6 +623,7 @@ command("allowdomain", "allowdomain <domain>", "Allow a domain when links are bl
   if (!cfg.allowed_domains.includes(d)) {
     cfg.allowed_domains.push(d);
     save();
+    audit(ctx.guild.id, { type: "allowdomain", target: "", mod: ctx.author.name, reason: d, source: "chat" });
   }
   await ctx.reply(`Links to ${d} are now allowed.`);
 });
@@ -682,58 +639,132 @@ command("setlog", "setlog <#channel>", "Set the mod-log channel", async (ctx, re
   }
   guildCfg(ctx.guild.id).log_channel = cid;
   save();
+  audit(ctx.guild.id, { type: "setlog", target: "", mod: ctx.author.name, reason: `Mod log set to channel ${cid}`, source: "chat" });
   await ctx.reply(`Mod log set to <#${cid}>.`);
+});
+
+// Who can use what (commands not listed are for everyone). Used by !help and the dashboard.
+const LEVELS = {
+  warn: "mod", warnings: "mod", unwarn: "mod", timeout: "mod", automod: "mod", dashboard: "mod", modhelp: "mod",
+  ban: "manage", unban: "manage", clearwarns: "manage", addword: "manage", delword: "manage",
+  words: "manage", links: "manage", allowdomain: "manage", setlog: "manage",
+};
+const RANK = { all: 0, mod: 1, manage: 2 };
+const LEVEL_LABEL = { all: "Everyone", mod: "Moderators", manage: "Server managers" };
+const levelOf = (ctx) => (canManage(ctx.author, ctx.guild) ? "manage" : canModerate(ctx.author, ctx.guild) ? "mod" : "all");
+const cmdLevel = (c) => LEVELS[c.name] ?? "all";
+
+command("help", "help [command]", "Show the commands you can use", async (ctx, rest) => {
+  const mine = RANK[levelOf(ctx)];
+  const asked = takeToken(rest)[0]?.toLowerCase().replace(/^[^\w]+/, "");
+  if (asked) {
+    const cmd = commands.get(asked);
+    if (!cmd) return void (await ctx.reply(`I don't have a command called "${asked}". Try ${PREFIX}help.`));
+    return void (await ctx.reply(`**${PREFIX}${cmd.usage}**\n${cmd.description}\nWho can use it: ${LEVEL_LABEL[cmdLevel(cmd)]}`));
+  }
+  const lines = ["**Commands**"];
+  for (const lvl of ["all", "mod", "manage"]) {
+    if (RANK[lvl] > mine) continue;
+    const list = [...commands.values()].filter((c) => cmdLevel(c) === lvl);
+    if (list.length) lines.push(`**${LEVEL_LABEL[lvl]}**`, ...list.map((c) => `${PREFIX}${c.usage} - ${c.description}`));
+  }
+  lines.push(`Type ${PREFIX}help <command> for details on one command.`);
+  if (mine === 0) lines.push("Moderators and server managers have extra commands.");
+  await ctx.reply(lines.join("\n"));
 });
 
 command("modhelp", "modhelp", "List moderation commands", async (ctx) => {
   if (!(await guard(ctx, "mod"))) return;
-  const p = PREFIX;
-  await ctx.reply(
-    "**Moderator commands**\n" +
-    `${p}warn @user [reason]\n` +
-    `${p}warnings @user\n` +
-    `${p}timeout @user <minutes> [reason]\n` +
-    "**Server managers only**\n" +
-    `${p}ban @user [reason] | ${p}unban <user id> | ${p}clearwarns @user\n` +
-    `${p}addword <word> | ${p}delword <word> | ${p}words\n` +
-    `${p}links on|off | ${p}allowdomain <domain>\n` +
-    `${p}setlog #channel\n` +
-    `${p}announce <message>\n` +
-    `${p}modstats`
-  );
+  await commands.get("help").handler(ctx, "");
+});
+
+command("ping", "ping", "Check that the bot is alive", async (ctx) => {
+  const t = Date.now();
+  try { await api("GET", "/me"); } catch { /* still answer */ }
+  await ctx.reply(`Pong! API round trip: ${Date.now() - t}ms`);
+});
+
+command("about", "about", "About this bot", async (ctx) => {
+  const s = Math.floor(process.uptime());
+  const up = `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+  const lines = [`**${me.username}** - moderation bot for Yapper`, `Uptime: ${up}`, `Servers: ${knownGuildIds().size}`];
+  if (process.env.DASHBOARD_URL) lines.push(`Dashboard: ${process.env.DASHBOARD_URL}`);
+  lines.push(`Type ${PREFIX}help to see what I can do.`);
+  await ctx.reply(lines.join("\n"));
+});
+
+command("dashboard", "dashboard", "Get the link to the web dashboard", async (ctx) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const url = process.env.DASHBOARD_URL;
+  await ctx.reply(url ? `Dashboard: ${url}` : "The web dashboard isn't set up yet.");
+});
+
+command("serverinfo", "serverinfo", "Show info about this server", async (ctx) => {
+  const g = ctx.guild;
+  await ctx.reply([`**${g.name}**`, `ID: ${g.id}`, `Owner: <@${g.ownerId}>`, `Roles: ${g.roles.size}`].join("\n"));
+});
+
+command("userinfo", "userinfo [user]", "Show info about a member", async (ctx, rest) => {
+  const uid = parseId(takeToken(rest)[0]) ?? ctx.author.id;
+  let m;
+  try { m = await getMember(ctx.guild, uid); } catch { return void (await ctx.reply("That user isn't in this server.")); }
+  const roles = m.roleIds.map((id) => ctx.guild.roles.get(id)?.name).filter(Boolean);
+  const lines = [`**${m.displayName}** (@${m.name})`, `ID: ${m.id}`, `Roles: ${roles.length ? roles.join(", ") : "none"}`];
+  if (isOwner(m, ctx.guild)) lines.push("Server owner");
+  if (canModerate(ctx.author, ctx.guild)) lines.push(`Warnings: ${(guildCfg(ctx.guild.id).warnings[m.id] ?? []).length}`);
+  await ctx.reply(lines.join("\n"));
+});
+
+command("mywarnings", "mywarnings", "Show your own warnings", async (ctx) => {
+  const warns = guildCfg(ctx.guild.id).warnings[ctx.author.id] ?? [];
+  if (!warns.length) return void (await ctx.reply("You have no warnings."));
+  const start = Math.max(0, warns.length - 10);
+  const lines = [`You have ${warns.length} warning(s):`];
+  warns.slice(start).forEach((w, i) => {
+    lines.push(`${start + i + 1}. ${w.reason} (${new Date(w.time * 1000).toISOString().slice(0, 10)})`);
+  });
+  await ctx.reply(lines.join("\n"));
+});
+
+command("unwarn", "unwarn <user> [number]", "Remove one warning (default: the latest)", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const [uTok, r1] = takeToken(rest);
+  const uid = parseId(uTok);
+  if (!uid) throw new UsageError();
+  const nTok = takeToken(r1)[0];
+  if (nTok && !/^\d+$/.test(nTok)) throw new UsageError();
+  const warns = guildCfg(ctx.guild.id).warnings[uid] ?? [];
+  if (!warns.length) return void (await ctx.reply(`<@${uid}> has no warnings.`));
+  const idx = nTok ? parseInt(nTok, 10) : warns.length;
+  if (idx < 1 || idx > warns.length) return void (await ctx.reply(`They only have ${warns.length} warning(s).`));
+  await removeWarning(ctx.guild, ctx.author.name, uid, idx);
+  await ctx.reply(`Removed warning #${idx} from <@${uid}>.`);
+});
+
+command("automod", "automod", "Show this server's auto-mod settings", async (ctx) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const c = guildCfg(ctx.guild.id);
+  const s = c.settings;
+  const on = (v) => (v ? "ON" : "OFF");
+  const esc = Object.entries(s.escalation).sort((a, b) => a[0] - b[0])
+    .map(([w, m]) => `${w} warnings -> ${m} min timeout`).join(", ") || "off";
+  await ctx.reply([
+    "**Auto-mod settings**",
+    `Banned words: ${on(s.automod_words)} (${c.banned_words.length} word(s))`,
+    `Link blocking: ${on(c.block_links)} (${c.allowed_domains.length} allowed domain(s))`,
+    `Spam: ${on(s.automod_spam)} (${s.spam_messages} messages in ${s.spam_seconds}s)`,
+    `Mass mentions: ${on(s.automod_mentions)} (more than ${s.max_mentions})`,
+    `Warning escalation: ${esc}`,
+    `Mod log: ${c.log_channel ? `<#${c.log_channel}>` : "not set"}`,
+  ].join("\n"));
 });
 
 async function runCommand(ctx) {
   if (!ctx.content.startsWith(PREFIX)) return;
-
   const [name, rest] = takeToken(ctx.content.slice(PREFIX.length));
   const cmd = name && commands.get(name.toLowerCase());
-
-  if (!cmd) return; // Ignore unknown commands
-
+  if (!cmd) return; // unknown commands are ignored
   try {
-    // Commands everyone is allowed to use
-    const publicCommands = new Set(["help", "report"]);
-
-    // Commands that require moderator permissions
-    const staffUtilityCommands = new Set([
-      "ping",
-      "serverinfo",
-      "userinfo",
-      "poll"
-    ]);
-
-    // Block regular users from all commands except help and report.
-    if (!publicCommands.has(cmd.name)) {
-      if (!(await guard(ctx, "mod"))) return;
-    }
-
-    // Keep the additional permission check for utility commands
-    // if they require the existing moderator guard.
-    if (staffUtilityCommands.has(cmd.name)) {
-      if (!(await guard(ctx, "mod"))) return;
-    }
-
     await cmd.handler(ctx, rest);
   } catch (e) {
     if (e instanceof UsageError) {
@@ -755,6 +786,7 @@ async function handleMessage(ev) {
 
   const channel = await getChannel(d.channel_id);
   if (!channel.server_id) return; // not a server channel
+  seenGuilds.add(String(channel.server_id));
   const guild = await getGuild(channel.server_id);
   const author = await getMember(guild, d.author_id);
 
@@ -777,25 +809,29 @@ function dispatch(ev) {
   handleMessage(ev).catch((e) => logErr("Unhandled error in message handler:", e));
 }
 
-async function main() {
-  if (!TOKEN) {
-    console.error("Set TOKEN in your environment or in a .env file next to modbot.mjs.");
-    process.exit(1);
-  }
+const botStatus = { state: "stopped", error: null, since: null };
+const seenGuilds = new Set();
+const markGuildSeen = (id) => seenGuilds.add(String(id));
+const knownGuildIds = () => new Set([...Object.keys(data), ...seenGuilds]);
+const getMe = () => me;
 
-  try {
-    await startDashboard({ getData: () => data, guildCfg, save });
-  } catch (e) {
-    logErr("Dashboard failed to start:", e.message);
-    process.exit(1);
-  }
+function fatal(msg, embedded) {
+  console.error(msg);
+  botStatus.state = "error";
+  botStatus.error = msg;
+  if (embedded) throw new Error(msg);
+  process.exit(1);
+}
+
+async function startBot({ embedded = false } = {}) {
+  botStatus.state = "starting";
+  if (!TOKEN) fatal("Set TOKEN in your environment or in a .env file next to modbot.mjs.", embedded);
 
   try {
     me = await api("GET", "/me");
   } catch (e) {
-    if (e.status === 401) console.error("Yapper rejected the token. Check that TOKEN is correct.");
-    else console.error("Couldn't reach Yapper:", e.message);
-    process.exit(1);
+    if (e.status === 401) fatal("Yapper rejected the token. Check that TOKEN is correct.", embedded);
+    fatal(`Couldn't reach Yapper: ${e.message}`, embedded);
   }
   log(`Logged in as ${me.username} (id ${me.id})`);
 
@@ -810,6 +846,8 @@ async function main() {
 
   const init = await api("GET", "/events?after=0&wait=0");
   let last = init.last;
+  botStatus.state = "online";
+  botStatus.since = Date.now();
   log("ModBot ready. Press Ctrl+C to stop.");
 
   let fails = 0;
@@ -819,12 +857,11 @@ async function main() {
       out = await api("GET", `/events?after=${last}&wait=25`);
       if (fails) log("Connection to Yapper restored");
       fails = 0;
+      botStatus.state = "online";
     } catch (e) {
-      if (e.status === 401) {
-        console.error("Yapper rejected the token. Check that TOKEN is correct.");
-        process.exit(1);
-      }
+      if (e.status === 401) fatal("Yapper rejected the token. Check that TOKEN is correct.", embedded);
       fails++;
+      if (fails >= 3) botStatus.state = "reconnecting";
       const wait = Math.min(30, 2 ** fails);
       log(`Problem reaching Yapper: ${e.message}. Retrying in ${wait}s`);
       await sleep(wait * 1000);
@@ -838,11 +875,17 @@ async function main() {
   }
 }
 
-// Exported for tests only.
-export { findBannedWord, findBadLink, parseId, takeToken };
+// Used by the dashboard server (server.mjs) and by tests.
+export {
+  findBannedWord, findBadLink, parseId, takeToken,
+  data, guildCfg, save, audit, api, startBot, botStatus, getMe,
+  getGuild, getMember, getChannel, canManage, canModerate, isOwner, checkTarget,
+  addWarning, timeoutUser, banUser, unbanUser, clearWarnings, removeWarning, modLog,
+  knownGuildIds, markGuildSeen, commands, LEVELS, LEVEL_LABEL, PREFIX, MAX_TIMEOUT_MINUTES,
+};
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   process.on("unhandledRejection", (e) => logErr("Unhandled rejection:", e));
   process.on("SIGINT", () => { log("Shutting down"); process.exit(0); });
-  main();
+  startBot();
 }

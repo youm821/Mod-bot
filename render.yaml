@@ -1,21 +1,30 @@
+# Render Blueprint: bot + dashboard in one web service.
+# The bot has to run 24/7, so this uses a paid instance (free ones go to sleep) and a
+# persistent disk so settings and warnings survive restarts and deploys.
 services:
   - type: web
-    name: yapper-modbot-dashboard
+    name: yapper-modbot
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node server.mjs
     healthCheckPath: /healthz
+    disk:
+      name: modbot-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
-        value: 20.18.0
-      - key: NODE_ENV
-        value: production
-      - key: TOKEN
-        sync: false
-      - key: DASHBOARD_SECRET
-        generateValue: true
-      - key: DASHBOARD_PASSWORD
-        sync: false
+        value: "22"
       - key: MODBOT_DATA
-        value: ./modbot_data.json
+        value: /var/data/modbot_data.json
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: TOKEN               # bot token (Yapin Settings > Developer)
+        sync: false
+      - key: YAPIN_CLIENT_ID     # from Settings > Developer > Login with Yapin'
+        sync: false
+      - key: YAPIN_CLIENT_SECRET
+        sync: false
+      - key: OWNER_IDS           # optional: your Yapin user id(s), comma separated
+        sync: false
