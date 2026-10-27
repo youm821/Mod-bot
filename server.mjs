@@ -191,7 +191,7 @@ function view(gid, a) {
     id: gid, name: a.guild.name, level: a.level,
     stats: { warnedUsers: warnings.length, totalWarnings: warnings.reduce((n, w) => n + w.length, 0), bannedWords: cfg.banned_words.length },
     log_channel: cfg.log_channel, block_links: cfg.block_links, allowed_domains: cfg.allowed_domains,
-    settings: cfg.settings,
+    settings: cfg.settings, rules: cfg.rules,
   };
   if (a.level === "manage") out.banned_words = cfg.banned_words;
   return out;
@@ -208,6 +208,15 @@ async function route(req, url, user) {
   }
   if (m === "GET" && p === "/api/servers") return { servers: await serversFor(user), botState: bot.botStatus.state };
 
+  if (m === "GET" && p === "/api/status") {
+    return {
+      botState: bot.botStatus.state, botError: bot.botStatus.error, botSince: bot.botStatus.since,
+      restarts: runtime.restarts, uptimeSeconds: Math.floor(process.uptime()),
+      servers: bot.knownGuildIds().size, memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+      keepAlive: runtime.keepAlive, lastSelfPing: runtime.lastPing, lastSelfPingOk: runtime.lastPingOk,
+      persistent: /^\/var\/data\//.test(env.MODBOT_DATA ?? ""), baseUrl: BASE_URL,
+    };
+  }
   if (!(r = p.match(/^\/api\/servers\/([\w-]+)(\/.*)?$/))) throw new HttpError(404, "Not found");
   const gid = r[1];
   const sub = r[2] ?? "";
@@ -226,6 +235,33 @@ async function route(req, url, user) {
   if (m === "GET" && sub === "/warnings") {
     const ids = Object.keys(cfg.warnings).sort((p1, p2) => cfg.warnings[p2].length - cfg.warnings[p1].length);
     return { users: ids.map((id) => ({ id, warnings: cfg.warnings[id] })), names: await namesFor(a.guild, ids) };
+  }
+
+  if (m === "GET" && sub.startsWith("/member/")) {
+    const uid = userIdOf(decodeURIComponent(sub.slice(8)));
+    let mem;
+    try { mem = await bot.getMember(a.guild, uid, true); } catch { throw new HttpError(404, "That user isn't in this server."); }
+    return {
+      member: { id: mem.id, name: mem.name, displayName: mem.displayName, isOwner: bot.isOwner(mem, a.guild), isMod: bot.canModerate(mem, a.guild),
+        roles: mem.roleIds.map((id) => a.guild.roles.get(id)?.name).filter(Boolean) },
+      warnings: cfg.warnings[uid] ?? [], notes: cfg.notes[uid] ?? [],
+      history: cfg.audit.filter((e) => e.target === uid).slice(-20).reverse(),
+    };
+  }
+  if (m === "POST" && sub === "/notes") {
+    const uid = userIdOf(body.userId);
+    (cfg.notes[uid] ??= []).push({ text: str(body.text, 300, "Note"), mod: actor, time: Math.floor(Date.now() / 1000) });
+    bot.save();
+    return { ok: true, message: "Note saved." };
+  }
+  if (m === "DELETE" && (x = sub.match(/^\/notes\/([\w-]+)\/(\d+)$/))) {
+    const list = cfg.notes[x[1]] ?? [];
+    const i = Number(x[2]);
+    if (i < 0 || i >= list.length) throw new HttpError(404, "That note no longer exists.");
+    list.splice(i, 1);
+    if (!list.length) delete cfg.notes[x[1]];
+    bot.save();
+    return { ok: true, message: "Note deleted." };
   }
 
   // ----- settings (managers)
@@ -257,6 +293,10 @@ async function route(req, url, user) {
         cfg.log_channel = cid;
       }
       changed.push("log_channel");
+    }
+    if ("rules" in body) {
+      if (typeof body.rules !== "string" || body.rules.length > 1500) throw bad("Rules must be text of up to 1500 characters.");
+      cfg.rules = body.rules.trim(); changed.push("rules");
     }
     if (!changed.length) throw bad("Nothing to change.");
     bot.audit(gid, { type: "settings", target: "", mod: actor, reason: `Changed: ${changed.join(", ")}`, source: "dashboard" });
@@ -442,8 +482,38 @@ http.createServer((req, res) => { handle(req, res).catch((e) => { console.error(
 process.on("unhandledRejection", (e) => console.error(ts(), "ERROR Unhandled rejection:", e));
 process.on("SIGTERM", () => { console.log(ts(), "Shutting down"); process.exit(0); });
 
+// ---------------------------------------------------------------- keep the bot + site online
+const runtime = { restarts: 0, keepAlive: false, lastPing: null, lastPingOk: null };
+
+// 1) If the bot ever stops (bad network, API hiccup), start it again instead of staying dead.
+async function superviseBot() {
+  while (true) {
+    try { await bot.startBot({ embedded: true }); } catch (e) { console.error(ts(), "Bot stopped:", e.message); }
+    runtime.restarts++;
+    const wait = Math.min(300, 15 * runtime.restarts);
+    console.log(ts(), `Restarting the bot in ${wait}s (restart #${runtime.restarts})`);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+  }
+}
+
+// 2) Ping our own public address every 10 minutes so Render doesn't see the service as idle.
+//    (This keeps an awake service awake. It can't wake one that is already asleep: see UptimeRobot in the README.)
+function startKeepAlive() {
+  const off = (env.KEEP_ALIVE ?? "").toLowerCase() === "off";
+  if (off || !BASE_URL.startsWith("https://")) return;
+  runtime.keepAlive = true;
+  const ping = async () => {
+    runtime.lastPing = Date.now();
+    try { const r = await fetch(`${BASE_URL}/healthz`, { signal: AbortSignal.timeout(20_000) }); runtime.lastPingOk = r.ok; }
+    catch { runtime.lastPingOk = false; }
+  };
+  setTimeout(ping, 60_000).unref();
+  setInterval(ping, 10 * 60_000).unref();
+}
+startKeepAlive();
+
 if (env.TOKEN) {
-  bot.startBot({ embedded: true }).catch((e) => console.error(ts(), "Bot stopped:", e.message));
+  superviseBot();
   setTimeout(discoverGuilds, 5000).unref();
   setInterval(discoverGuilds, 30 * 60_000).unref();
 } else {

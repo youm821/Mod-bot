@@ -86,6 +86,8 @@ function guildCfg(gid) {
   g.allowed_domains ??= [];
   g.warnings ??= {};
   g.audit ??= [];
+  g.notes ??= {};
+  g.rules ??= "";
   const s = (g.settings ??= {});
   s.automod_words ??= true;
   s.automod_spam ??= true;
@@ -648,6 +650,8 @@ const LEVELS = {
   warn: "mod", warnings: "mod", unwarn: "mod", timeout: "mod", automod: "mod", dashboard: "mod", modhelp: "mod",
   ban: "manage", unban: "manage", clearwarns: "manage", addword: "manage", delword: "manage",
   words: "manage", links: "manage", allowdomain: "manage", setlog: "manage",
+  history: "mod", modlog: "mod", topwarned: "mod", stats: "mod", note: "mod", notes: "mod", delnote: "mod", say: "mod",
+  setrules: "manage", filter: "manage", setspam: "manage", setmentions: "manage", escalate: "manage",
 };
 const RANK = { all: 0, mod: 1, manage: 2 };
 const LEVEL_LABEL = { all: "Everyone", mod: "Moderators", manage: "Server managers" };
@@ -757,6 +761,180 @@ command("automod", "automod", "Show this server's auto-mod settings", async (ctx
     `Warning escalation: ${esc}`,
     `Mod log: ${c.log_channel ? `<#${c.log_channel}>` : "not set"}`,
   ].join("\n"));
+});
+
+
+// ---- More commands ---------------------------------------------------------
+const fmtDay = (t) => new Date(t * 1000).toISOString().slice(0, 10);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const cleanOut = (s) => s.replace(/<@/g, "<\u200b@"); // stop the bot from pinging people by accident
+
+command("rules", "rules", "Show this server's rules", async (ctx) => {
+  const r = guildCfg(ctx.guild.id).rules;
+  await ctx.reply(r ? `**Rules for ${ctx.guild.name}**\n${r}` : "No rules have been set yet. A server manager can add them with !setrules.");
+});
+
+command("setrules", "setrules <text>", "Set the rules shown by !rules", async (ctx, rest) => {
+  if (!(await guard(ctx, "manage"))) return;
+  const text = rest.trim();
+  if (!text || text.length > 1500) throw new UsageError();
+  guildCfg(ctx.guild.id).rules = text;
+  save();
+  audit(ctx.guild.id, { type: "settings", target: "", mod: ctx.author.name, reason: "Changed: rules", source: "chat" });
+  await ctx.reply("Rules updated. Members can read them with !rules.");
+});
+
+command("history", "history <user>", "Show moderation actions taken against a user", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const uid = parseId(takeToken(rest)[0]);
+  if (!uid) throw new UsageError();
+  const rows = guildCfg(ctx.guild.id).audit.filter((e) => e.target === uid).slice(-10);
+  if (!rows.length) return void (await ctx.reply(`Nothing on record for <@${uid}>.`));
+  await ctx.reply([`Last ${rows.length} action(s) for <@${uid}>:`, ...rows.map((e) => `${fmtDay(e.time)} - ${e.type} by ${e.mod}${e.reason ? `: ${e.reason}` : ""}`)].join("\n"));
+});
+
+command("modlog", "modlog [count]", "Show the latest moderation actions (default 5)", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const n = Math.min(15, Math.max(1, parseInt(takeToken(rest)[0] ?? "5", 10) || 5));
+  const rows = guildCfg(ctx.guild.id).audit.slice(-n).reverse();
+  if (!rows.length) return void (await ctx.reply("No actions recorded yet."));
+  await ctx.reply(["**Latest actions**", ...rows.map((e) => `${fmtDay(e.time)} - ${e.type}${e.target ? ` <@${e.target}>` : ""} by ${e.mod}${e.reason ? `: ${e.reason}` : ""}`)].join("\n"));
+});
+
+command("topwarned", "topwarned", "Show the members with the most warnings", async (ctx) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const list = Object.entries(guildCfg(ctx.guild.id).warnings).sort((a, b) => b[1].length - a[1].length).slice(0, 5);
+  if (!list.length) return void (await ctx.reply("Nobody has any warnings."));
+  await ctx.reply(["**Most warned**", ...list.map(([id, w], i) => `${i + 1}. <@${id}> - ${w.length} warning(s)`)].join("\n"));
+});
+
+command("stats", "stats", "Show moderation numbers for this server", async (ctx) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const c = guildCfg(ctx.guild.id);
+  const week = Date.now() / 1000 - 7 * 86400;
+  const recent = c.audit.filter((e) => e.time >= week);
+  const count = (t) => recent.filter((e) => e.type === t).length;
+  await ctx.reply([
+    "**Moderation stats**",
+    `Members with warnings: ${Object.keys(c.warnings).length}`,
+    `Total warnings: ${Object.values(c.warnings).reduce((n, w) => n + w.length, 0)}`,
+    `Last 7 days: ${count("warn")} warnings, ${count("timeout")} timeouts, ${count("ban")} bans`,
+    `Done by AutoMod (7 days): ${recent.filter((e) => e.source === "automod").length}`,
+  ].join("\n"));
+});
+
+command("note", "note <user> <text>", "Add a private moderator note about a user", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const [tok, text] = takeToken(rest);
+  const uid = parseId(tok);
+  if (!uid || !text.trim() || text.length > 300) throw new UsageError();
+  const c = guildCfg(ctx.guild.id);
+  (c.notes[uid] ??= []).push({ text: text.trim(), mod: ctx.author.name, time: Math.floor(Date.now() / 1000) });
+  save();
+  await ctx.reply(`Note saved for <@${uid}>. Your message will be removed so the note stays private.`);
+  try { await ctx.del(); } catch { /* ignore */ }
+});
+
+command("notes", "notes <user>", "Show moderator notes about a user", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const uid = parseId(takeToken(rest)[0]);
+  if (!uid) throw new UsageError();
+  const list = guildCfg(ctx.guild.id).notes[uid] ?? [];
+  if (!list.length) return void (await ctx.reply(`No notes for <@${uid}>.`));
+  await ctx.reply([`Notes for <@${uid}>:`, ...list.slice(-10).map((n, i) => `${Math.max(0, list.length - 10) + i + 1}. ${cleanOut(n.text)} (${n.mod}, ${fmtDay(n.time)})`)].join("\n"));
+});
+
+command("delnote", "delnote <user> <number>", "Delete a moderator note", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const [tok, r1] = takeToken(rest);
+  const uid = parseId(tok);
+  const n = parseInt(takeToken(r1)[0] ?? "", 10);
+  if (!uid || !n) throw new UsageError();
+  const c = guildCfg(ctx.guild.id);
+  const list = c.notes[uid] ?? [];
+  if (n < 1 || n > list.length) return void (await ctx.reply(`They only have ${list.length} note(s).`));
+  list.splice(n - 1, 1);
+  if (!list.length) delete c.notes[uid];
+  save();
+  await ctx.reply("Note deleted.");
+});
+
+command("say", "say <text>", "Make the bot post a message", async (ctx, rest) => {
+  if (!(await guard(ctx, "mod"))) return;
+  const text = rest.trim();
+  if (!text || text.length > 1500) throw new UsageError();
+  await send(ctx.channelId, cleanOut(text));
+  try { await ctx.del(); } catch { /* ignore */ }
+});
+
+command("filter", "filter <words|spam|mentions|links> on|off", "Turn one auto-mod filter on or off", async (ctx, rest) => {
+  if (!(await guard(ctx, "manage"))) return;
+  const [what, r1] = takeToken(rest);
+  const on = parseBool(takeToken(r1)[0]);
+  const key = { words: "automod_words", spam: "automod_spam", mentions: "automod_mentions" }[(what ?? "").toLowerCase()];
+  const c = guildCfg(ctx.guild.id);
+  if (on === null || (!key && (what ?? "").toLowerCase() !== "links")) throw new UsageError();
+  if (key) c.settings[key] = on; else c.block_links = on;
+  save();
+  audit(ctx.guild.id, { type: "settings", target: "", mod: ctx.author.name, reason: `Changed: ${what} ${on ? "on" : "off"}`, source: "chat" });
+  await ctx.reply(`${what} filter is now ${on ? "ON" : "OFF"}.`);
+});
+
+command("setspam", "setspam <messages> <seconds>", "Set how much chatter counts as spam", async (ctx, rest) => {
+  if (!(await guard(ctx, "manage"))) return;
+  const [a, r1] = takeToken(rest);
+  const m = parseInt(a ?? "", 10), sec = parseInt(takeToken(r1)[0] ?? "", 10);
+  if (!(m >= 2 && m <= 30 && sec >= 2 && sec <= 60)) return void (await ctx.reply(`Usage: ${PREFIX}setspam <2-30 messages> <2-60 seconds>`));
+  const s = guildCfg(ctx.guild.id).settings;
+  s.spam_messages = m; s.spam_seconds = sec;
+  save();
+  await ctx.reply(`Spam rule: ${m} messages in ${sec} seconds.`);
+});
+
+command("setmentions", "setmentions <number>", "Set the most mentions allowed in one message", async (ctx, rest) => {
+  if (!(await guard(ctx, "manage"))) return;
+  const n = parseInt(takeToken(rest)[0] ?? "", 10);
+  if (!(n >= 1 && n <= 50)) return void (await ctx.reply(`Usage: ${PREFIX}setmentions <1-50>`));
+  guildCfg(ctx.guild.id).settings.max_mentions = n;
+  save();
+  await ctx.reply(`Messages with more than ${n} mentions will now be removed.`);
+});
+
+command("escalate", "escalate <warnings> <minutes|off>", "Set the timeout given at a warning count", async (ctx, rest) => {
+  if (!(await guard(ctx, "manage"))) return;
+  const [a, r1] = takeToken(rest);
+  const w = parseInt(a ?? "", 10);
+  const t = (takeToken(r1)[0] ?? "").toLowerCase();
+  if (!(w >= 1 && w <= 50) || !t) throw new UsageError();
+  const esc = guildCfg(ctx.guild.id).settings.escalation;
+  if (t === "off") { delete esc[w]; save(); return void (await ctx.reply(`No automatic timeout at ${w} warnings.`)); }
+  const mins = parseInt(t, 10);
+  if (!(mins >= 1 && mins <= MAX_TIMEOUT_MINUTES)) return void (await ctx.reply(`Minutes must be between 1 and ${MAX_TIMEOUT_MINUTES}.`));
+  esc[w] = mins; save();
+  await ctx.reply(`At ${w} warnings, members get a ${mins} minute timeout.`);
+});
+
+command("uptime", "uptime", "Show how long the bot has been running", async (ctx) => {
+  const s = Math.floor(process.uptime());
+  await ctx.reply(`Up for ${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h ${Math.floor((s % 3600) / 60)}m.`);
+});
+
+command("roll", "roll [sides]", "Roll a dice (default 6 sides)", async (ctx, rest) => {
+  const n = Math.min(1000000, Math.max(2, parseInt(takeToken(rest)[0] ?? "6", 10) || 6));
+  await ctx.reply(`You rolled a ${1 + Math.floor(Math.random() * n)} (1-${n}).`);
+});
+
+command("flip", "flip", "Flip a coin", async (ctx) => { await ctx.reply(Math.random() < 0.5 ? "Heads." : "Tails."); });
+
+command("choose", "choose <a | b | c>", "Pick one option at random", async (ctx, rest) => {
+  const opts = rest.split("|").map((x) => x.trim()).filter(Boolean);
+  if (opts.length < 2) throw new UsageError();
+  await ctx.reply(`I pick: ${cleanOut(pick(opts))}`);
+});
+
+command("eightball", "eightball <question>", "Ask the magic 8-ball", async (ctx, rest) => {
+  if (!rest.trim()) throw new UsageError();
+  await ctx.reply(pick(["Yes.", "No.", "Definitely.", "Not a chance.", "Ask again later.", "Probably.", "I wouldn't count on it.", "Signs point to yes."]));
 });
 
 async function runCommand(ctx) {

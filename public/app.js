@@ -22,6 +22,9 @@ const ICONS = {
   warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>',
   book: '<path d="M3 5h7a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H3zM21 5h-7a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h7z"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.500 20c0-3.500 3-6 6.500-6s6.500 2.500 6.500 6M16 4.500a3.500 3.500 0 0 1 0 7M18 14.500c2.200.8 3.500 2.800 3.500 5.500"/>',
+  pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
 };
 function icon(name) {
@@ -88,8 +91,8 @@ function renderLogin() {
 }
 
 // ---------- shell
-const NAV = [["home", "Home", "home"], ["moderate", "Moderate", "shield"], ["automod", "Auto-mod", "gear"], ["warnings", "Warnings", "warn"], ["commands", "Commands", "book"]];
-const TITLES = { home: "Home", moderate: "Moderate", automod: "Auto-mod", warnings: "Warnings", commands: "Commands" };
+const NAV = [["home", "Home", "home"], ["moderate", "Moderate", "shield"], ["automod", "Auto-mod", "gear"], ["warnings", "Warnings", "warn"], ["members", "Members", "users"], ["activity", "Activity", "list"], ["commands", "Commands", "book"], ["status", "Status", "pulse"]];
+const TITLES = { home: "Home", moderate: "Moderate", automod: "Auto-mod", warnings: "Warnings", members: "Members", activity: "Activity", commands: "Commands", status: "Status" };
 
 function shell(compact, kpis, content) {
   const u = S.me.user, nm = u.displayName || u.username;
@@ -125,7 +128,7 @@ async function load() {
       h("p", { class: "hint" }, "A server shows up once the bot has seen a message there, and you need the Manage Messages permission in it. Send a message in your server, then reload.")));
     localStorage.setItem("ym_gid", S.gid);
     S.srv = await api("GET", base());
-    const views = { home: vHome, moderate: vModerate, automod: vAutomod, warnings: vWarnings, commands: vCommands };
+    const views = { home: vHome, moderate: vModerate, automod: vAutomod, warnings: vWarnings, commands: vCommands, members: vMembers, activity: vActivity, status: vStatus };
     await views[S.view]();
   } catch (e) { if (e.message !== "login") { shell(true, null, h("div", { class: "card" }, h("h2", {}, "Couldn't load"), h("p", { class: "hint" }, e.message))); } }
 }
@@ -200,6 +203,7 @@ async function vAutomod() {
   const patch = async (b) => { const r = await act(() => api("PATCH", base() + "/settings", b)); await refreshSrv(); await vAutomod(); return r; };
   const num = (v, min, max) => h("input", { type: "number", value: v, min, max, disabled: dis });
   const spamN = num(st.spam_messages, 2, 30), spamS = num(st.spam_seconds, 2, 60), menN = num(st.max_mentions, 1, 50);
+  const rulesBox = h("textarea", { class: "ta", rows: 7, maxlength: 1500, disabled: dis, placeholder: "1. Be kind\n2. No spam" }); rulesBox.value = s.rules ?? "";
   const logI = h("input", { type: "text", value: s.log_channel ?? "", placeholder: "#channel or id", disabled: dis });
   const esc = Object.entries(st.escalation).sort((a, b) => a[0] - b[0]).map(([w, mins]) => ({ w, mins }));
   const escBox = h("div", {});
@@ -229,12 +233,14 @@ async function vAutomod() {
         h("label", {}, "Mod log channel"), logI,
         h("div", { class: "actions" }, h("button", { class: "btn ghost", disabled: dis, onclick: () => patch({ log_channel: logI.value }) }, "Save channel"))),
       m && h("div", { class: "card" }, h("h2", { class: "sm" }, "Banned words"), s.banned_words.length ? chips(s.banned_words, async (w) => { await act(() => api("DELETE", base() + "/words/" + encodeURIComponent(w))); await refreshSrv(); vAutomod(); }) : h("p", { class: "hint" }, "No words yet."), addRow("Add a word or phrase", wordsAdd)),
-      h("div", { class: "card" }, h("h2", { class: "sm" }, "Allowed domains"), s.allowed_domains.length ? chips(s.allowed_domains, async (d) => { await act(() => api("DELETE", base() + "/domains/" + encodeURIComponent(d))); await refreshSrv(); vAutomod(); }) : h("p", { class: "hint" }, "No domains yet."), m && addRow("example.com", domAdd)))]);
+      h("div", { class: "card" }, h("h2", { class: "sm" }, "Allowed domains"), s.allowed_domains.length ? chips(s.allowed_domains, async (d) => { await act(() => api("DELETE", base() + "/domains/" + encodeURIComponent(d))); await refreshSrv(); vAutomod(); }) : h("p", { class: "hint" }, "No domains yet."), m && addRow("example.com", domAdd)),
+      h("div", { class: "card" }, h("h2", { class: "sm" }, "Server rules"), h("p", { class: "hint" }, "Members see this when they type !rules."),
+        rulesBox, m && h("div", { class: "actions" }, h("button", { class: "btn", onclick: () => patch({ rules: rulesBox.value }) }, "Save rules"))))]);
 }
 
 async function vWarnings() {
   const w = await ensure("warn", base() + "/warnings");
-  const rm = async (uid, i) => { await act(() => api("DELETE", `${base()}/warnings/${uid}/${i}`)); await refreshSrv(); vWarnings(); };
+  const rm = async (uid, i) => { await act(() => api("DELETE", `${base()}/warnings/${uid}/${i + 1}`)); await refreshSrv(); vWarnings(); };
   const clear = async (uid) => { if (!confirm("Clear all warnings for this member?")) return; await act(() => api("DELETE", `${base()}/warnings/${uid}`)); await refreshSrv(); vWarnings(); };
   shell(true, null, h("div", { class: "card" }, h("h2", {}, "Members with warnings"),
     w.users.length ? w.users.map((u) => h("details", { class: "user" },
@@ -250,6 +256,71 @@ async function vCommands() {
   shell(true, null, h("div", { class: "card" }, h("h2", {}, "Chat commands"), h("p", { class: "hint" }, `Type these in your server. Prefix: ${c.prefix}`),
     h("table", {}, h("thead", {}, h("tr", {}, ["Command", "What it does", "Who", ""].map((x) => h("th", {}, x)))),
       h("tbody", {}, c.commands.map((x) => h("tr", {}, h("td", {}, h("b", {}, c.prefix + x.name)), h("td", {}, x.description), h("td", {}, c.labels?.[x.level] ?? x.level), h("td", {}, h("code", {}, x.usage || ""))))))));
+}
+
+// ---------- more pages
+async function vActivity() {
+  const act = await api("GET", base() + "/activity");
+  const types = ["all", ...new Set(act.entries.map((e) => e.type))];
+  let type = "all", q = "";
+  const body = h("div", {});
+  const draw = () => {
+    const rows = act.entries.filter((e) => (type === "all" || e.type === type) && (!q || `${e.reason} ${e.mod} ${nameOf(act.names, e.target)}`.toLowerCase().includes(q)));
+    body.replaceChildren(rows.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Type", "User", "By", "Reason", "When", "Source"].map((c) => h("th", {}, c)))),
+      h("tbody", {}, rows.map((e) => h("tr", {}, h("td", {}, badge(e.type)), h("td", {}, nameOf(act.names, e.target)), h("td", {}, e.mod), h("td", { class: "reason", title: e.reason }, e.reason || "-"), h("td", {}, ago(e.time)), h("td", {}, e.source || "chat")))))
+      : h("div", { class: "empty" }, "Nothing matches. Try another filter."));
+  };
+  const chips = h("div", { class: "chips" }, types.map((t) => h("button", { class: "btn ghost sm", onclick: () => { type = t; draw(); } }, t)));
+  shell(true, null, h("div", { class: "card" }, h("h2", {}, "All activity"), h("p", { class: "hint" }, `The last ${act.entries.length} actions on this server.`), chips,
+    h("input", { type: "text", placeholder: "Search by name, moderator or reason", oninput: (e) => { q = e.target.value.toLowerCase(); draw(); } }), body));
+  draw();
+}
+
+async function vMembers() {
+  const out = h("div", {});
+  const idI = h("input", { type: "text", placeholder: "User id or @mention" });
+  const lookup = async (id) => {
+    const r = await act(() => api("GET", `${base()}/member/${encodeURIComponent(id)}`), "Found.");
+    if (!r) return out.replaceChildren();
+    const m = r.member, again = () => lookup(m.id);
+    const reasonI = h("input", { type: "text", placeholder: "Reason (optional)" }), minI = h("input", { type: "number", min: 1, value: 10 }), noteI = h("input", { type: "text", placeholder: "Private note for moderators" });
+    const warnCard = h("div", { class: "card" }, h("h2", { class: "sm" }, `Warnings (${r.warnings.length})`),
+      r.warnings.length ? h("div", { class: "wlist" }, r.warnings.map((x, i) => h("div", { class: "wl" }, h("span", {}, x.reason, " ", h("small", {}, `by ${x.mod} · ${ago(x.time)}`)),
+        h("button", { class: "iconbtn red", "aria-label": "Remove warning", onclick: async () => { await act(() => api("DELETE", `${base()}/warnings/${m.id}/${i + 1}`)); await refreshSrv(); again(); } }, icon("trash")))))
+        : h("p", { class: "hint" }, "No warnings."));
+    const noteCard = h("div", { class: "card" }, h("h2", { class: "sm" }, `Private notes (${r.notes.length})`),
+      r.notes.length ? h("div", { class: "wlist" }, r.notes.map((x, i) => h("div", { class: "wl" }, h("span", {}, x.text, " ", h("small", {}, `by ${x.mod} · ${ago(x.time)}`)),
+        h("button", { class: "iconbtn red", "aria-label": "Delete note", onclick: async () => { await act(() => api("DELETE", `${base()}/notes/${m.id}/${i}`)); again(); } }, icon("trash"))))) : h("p", { class: "hint" }, "No notes yet."),
+      h("div", { class: "inline" }, noteI, h("button", { class: "btn sm", onclick: async () => { if (noteI.value.trim() && await act(() => api("POST", base() + "/notes", { userId: m.id, text: noteI.value }))) again(); } }, "Add")));
+    const histCard = h("div", { class: "card" }, h("h2", { class: "sm" }, "History"),
+      r.history.length ? h("div", { class: "wlist" }, r.history.map((e) => h("div", { class: "wl" }, badge(e.type), h("span", {}, e.reason || "-", " ", h("small", {}, `by ${e.mod} · ${ago(e.time)}`))))) : h("p", { class: "hint" }, "Nothing on record."));
+    const infoCard = h("div", { class: "card" }, h("h2", { class: "sm" }, m.displayName), h("p", { class: "hint" }, `@${m.name} · id ${m.id}`),
+      h("div", { class: "chips" }, m.isOwner && h("span", { class: "chip" }, "Server owner"), m.isMod && h("span", { class: "chip" }, "Moderator"), m.roles.map((x) => h("span", { class: "chip" }, x))),
+      h("label", {}, "Reason"), reasonI, h("label", {}, "Timeout minutes"), minI,
+      h("div", { class: "actions" },
+        h("button", { class: "btn", onclick: async () => { if (await act(() => api("POST", base() + "/warnings", { userId: m.id, reason: reasonI.value }))) { await refreshSrv(); again(); } } }, "Warn"),
+        h("button", { class: "btn ghost", onclick: async () => { if (await act(() => api("POST", base() + "/timeout", { userId: m.id, minutes: minI.value, reason: reasonI.value }))) again(); } }, "Time out")));
+    out.replaceChildren(h("div", { class: "grid2" }, infoCard, warnCard, noteCard, histCard));
+  };
+  shell(true, null, [h("div", { class: "card" }, h("h2", {}, "Find a member"), h("p", { class: "hint" }, "See their roles, warnings, notes and history in one place."),
+    h("div", { class: "inline" }, idI, h("button", { class: "btn", onclick: () => idI.value.trim() && lookup(idI.value.trim()) }, "Look up"))), h("div", { class: "gap" }), out]);
+}
+
+async function vStatus() {
+  const st = await api("GET", "/status");
+  const dur = (s) => `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+  const row = (k, v) => h("div", { class: "wl" }, h("span", {}, k), h("b", {}, v));
+  const url = st.baseUrl + "/healthz";
+  shell(true, null, h("div", { class: "grid2" },
+    h("div", { class: "card" }, h("h2", { class: "sm" }, "Bot"),
+      row("State", [h("span", { class: "dot " + st.botState }), st.botState]), st.botError && row("Last error", st.botError),
+      row("Running for", dur(st.uptimeSeconds)), row("Automatic restarts", String(st.restarts)), row("Servers seen", String(st.servers)), row("Memory", st.memoryMB + " MB")),
+    h("div", { class: "card" }, h("h2", { class: "sm" }, "Staying online"),
+      row("Self-ping", st.keepAlive ? (st.lastSelfPing ? (st.lastSelfPingOk ? "working" : "failed") + ", " + ago(st.lastSelfPing / 1000) : "starting") : "off"),
+      row("Data saved across restarts", st.persistent ? "yes" : "no"),
+      !st.persistent && h("p", { class: "hint" }, "Warnings and settings are stored on a disk that resets on redeploys or restarts. Use a paid Render plan with a disk to keep them."),
+      h("p", { class: "hint" }, "To stop a free Render service from falling asleep, add this address to a free uptime monitor (like UptimeRobot) with a 5 minute interval:"),
+      h("div", { class: "inline" }, h("input", { type: "text", value: url, readonly: true }), h("button", { class: "btn sm", onclick: () => navigator.clipboard?.writeText(url).then(() => toast("Copied.")) }, "Copy")))));
 }
 
 load().catch(() => {});

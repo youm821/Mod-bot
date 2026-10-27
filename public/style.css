@@ -156,3 +156,9 @@ details.user summary::-webkit-details-marker{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 details.user summary .av{width:38px;height:38px;border-radius:10px;background:var(--navy1);color:#fff;display:grid;place-items:center;font-weight:600;font-size:13px}
 details.user summary b{flex:1}
+textarea.ta{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;resize:vertical;font:inherit}
+textarea.ta:disabled{background:#f3f5f9}
+.gap{height:22px}
+.wl b{font-weight:600;color:var(--ink)}
+.rail{overflow-y:auto}.nav{margin-top:20px}.nav button{padding:11px 4px 9px}
+input[readonly]{background:#f3f5f9}
