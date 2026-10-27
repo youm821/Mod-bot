@@ -20,8 +20,8 @@ const SECURE = BASE_URL.startsWith("https://");
 const REDIRECT_URI = `${BASE_URL}/auth/callback`;
 env.DASHBOARD_URL ??= BASE_URL;
 
-const CLIENT_ID = env.YAPIN_CLIENT_ID;
-const CLIENT_SECRET = env.YAPIN_CLIENT_SECRET;
+const CLIENT_ID = env.YAPIN_CLIENT_ID ?? env.YAPPER_CLIENT_ID;
+const CLIENT_SECRET = env.YAPIN_CLIENT_SECRET ?? env.YAPPER_CLIENT_SECRET;
 const AUTHORIZE_URL = env.YAPIN_OAUTH_AUTHORIZE ?? "https://www.yapin.gg/oauth/authorize";
 const TOKEN_URL = env.YAPIN_OAUTH_TOKEN ?? "https://www.yapin.gg/api/oauth/token";
 const ME_URL = env.YAPIN_OAUTH_ME ?? "https://www.yapin.gg/api/oauth/me";
@@ -83,26 +83,20 @@ function limited(req, bucket, max, windowMs = 60_000) {
 setInterval(() => { const c = Date.now() - 120_000; for (const [k, a] of hits) if (a[a.length - 1] < c) hits.delete(k); }, 60_000).unref();
 
 // ---------------------------------------------------------------- Login with Yapin'
-async function oauthPost(body, asForm) {
+async function exchangeCode(code) {
+  // Documented request: form-encoded POST. The code works once, for 60 seconds, so no retries.
   const res = await fetch(TOKEN_URL, {
     method: "POST",
-    headers: { "Content-Type": asForm ? "application/x-www-form-urlencoded" : "application/json", Accept: "application/json" },
-    body: asForm ? new URLSearchParams(body).toString() : JSON.stringify(body),
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI, client_id: CLIENT_ID, client_secret: CLIENT_SECRET }),
     signal: AbortSignal.timeout(15_000),
   });
   let json = null;
   try { json = await res.json(); } catch { /* ignore */ }
-  return { res, json };
-}
-
-async function exchangeCode(code) {
-  const body = { grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI, client_id: CLIENT_ID, client_secret: CLIENT_SECRET };
-  let { res, json } = await oauthPost(body, false);
-  // If the server wanted form encoding instead of JSON, try that once (a wrong-format request never uses up the code).
-  if (!res.ok && [400, 415].includes(res.status) && json?.error !== "invalid_grant") ({ res, json } = await oauthPost(body, true));
-  const token = json?.access_token ?? json?.accessToken;
-  if (!res.ok || !token) throw new Error(`token exchange failed (${res.status}) ${json?.error ?? ""}`.trim());
-  return token;
+  if (!res.ok || !json?.access_token) {
+    throw new Error(`token exchange failed (${res.status}) ${json?.error ?? ""} ${json?.error_description ?? ""}`.trim());
+  }
+  return json.access_token;
 }
 
 async function fetchIdentity(token) {

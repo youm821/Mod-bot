@@ -16,7 +16,10 @@ SET UP LOGIN WITH YAPIN'
   2. In Yapin': Settings > Developer > Login with Yapin' > make an app.
      (Yapin' says this is in testing, so not every account can make one yet.)
   3. Add this redirect URL, exactly:   https://YOUR-SITE/auth/callback
-  4. Copy the client ID and client secret into Render as YAPIN_CLIENT_ID and YAPIN_CLIENT_SECRET.
+  4. Copy the client ID and client secret (shown once!) into Render as YAPIN_CLIENT_ID and
+     YAPIN_CLIENT_SECRET (YAPPER_CLIENT_ID / YAPPER_CLIENT_SECRET work too).
+  5. Tokens last 30 days and there are no refresh tokens, so the dashboard asks people to log in again
+     after that (sessions here last 7 days).
 
 DEPLOY ON RENDER
   1. Put these files in a GitHub repo (the .gitignore keeps .env and your data out of it).
