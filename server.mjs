@@ -388,6 +388,9 @@ const STATIC = {
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
   "/favicon.svg": ["favicon.svg", "image/svg+xml"],
+  "/logo.svg": ["logo.svg", "image/svg+xml"],
+  "/logo-wordmark.svg": ["logo-wordmark.svg", "image/svg+xml"],
+  "/logo-512.png": ["logo-512.png", "image/png"],
 };
 const HEADERS = {
   "Content-Security-Policy": "default-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",

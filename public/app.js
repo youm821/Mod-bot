@@ -83,7 +83,7 @@ function perDay(entries, days, filter = () => true) {
 function renderLogin() {
   const err = new URLSearchParams(location.search).get("login_error");
   root.replaceChildren(h("div", { class: "login" }, h("div", { class: "box" },
-    h("div", { class: "logo2" }, "R"),
+    h("img", { class: "logo2", src: "/logo.svg", alt: "ModBot" }),
     h("h1", {}, "Yapper ModBot"),
     h("p", {}, "Log in with your Yapin' account to manage warnings, auto-mod and moderation for your servers."),
     err && h("div", { class: "err" }, err),
@@ -99,7 +99,7 @@ function shell(compact, kpis, content) {
   const pick = h("select", { class: "pick", "aria-label": "Server", onchange: (e) => { S.gid = e.target.value; localStorage.setItem("ym_gid", S.gid); S.cache = {}; load(); } },
     S.servers.length ? S.servers.map((s) => h("option", { value: s.id, selected: s.id === S.gid }, s.name)) : h("option", {}, "No servers yet"));
   root.replaceChildren(h("div", { class: "app" },
-    h("aside", { class: "rail" }, h("div", { class: "logo" }, "R"),
+    h("aside", { class: "rail" }, h("div", { class: "logo" }, h("img", { src: "/logo.svg", alt: "ModBot" })),
       h("nav", { class: "nav" }, NAV.map(([id, label, ic]) => h("button", { "aria-current": S.view === id ? "page" : null, "aria-label": label, onclick: () => { S.view = id; load(); } }, icon(ic), label)))),
     h("div", { class: "main" },
       h("div", { class: "band" + (compact ? " compact" : "") },
