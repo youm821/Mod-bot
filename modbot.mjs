@@ -27,7 +27,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // --------------------------------------------------------------------------
 // Settings you can tweak
 // --------------------------------------------------------------------------
-const PREFIX = "!";
+const PREFIX = "/";
 const SPAM_MESSAGES = 5;          // this many messages...
 const SPAM_SECONDS = 6;           // ...within this many seconds counts as spam
 const MAX_MENTIONS = 5;           // more mentions than this in one message is removed
