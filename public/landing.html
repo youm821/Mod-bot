@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yapper ModBot: calm, automatic moderation</title>
+<meta name="description" content="Auto-mod, warnings, timeouts and a clean web dashboard for your Yapper server.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/landing.css">
+</head>
+<body>
+<div class="blobs" aria-hidden="true"><span class="b1"></span><span class="b2"></span><span class="b3"></span></div>
+
+<header class="nav">
+  <a class="brand" href="/"><span class="logo">R</span>ModBot</a>
+  <nav aria-label="Main">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#commands">Commands</a>
+  </nav>
+  <a class="btn" href="/dashboard">Open dashboard</a>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="copy">
+      <span class="pill">Moderation for Yapper</span>
+      <h1>Keep your server calm, <em>without</em> babysitting it.</h1>
+      <p>ModBot removes spam and banned words, hands out warnings, and times people out automatically. Manage everything from a clean dashboard or with simple chat commands.</p>
+      <div class="cta">
+        <a class="btn big" href="/auth/login">Login with Yapin’</a>
+        <a class="btn ghost big" href="#features">See what it does</a>
+      </div>
+      <ul class="ticks">
+        <li>Free to run</li><li>Works from chat or the web</li><li>Keeps a full action history</li>
+      </ul>
+    </div>
+
+    <div class="stage" aria-hidden="true">
+      <div class="mock">
+        <div class="m-rail"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+        <div class="m-list">
+          <div class="m-item on"><b>Warnings</b><small>12 members</small></div>
+          <div class="m-item"><b>Auto-mod</b><small>3 filters on</small></div>
+          <div class="m-item"><b>Members</b><small>Look up anyone</small></div>
+          <div class="m-item"><b>Activity</b><small>Last 100 actions</small></div>
+        </div>
+        <div class="m-main">
+          <div class="m-row"><span class="av a1">MK</span><div><b>Maya K.</b><small>Used a banned word</small></div><em class="tag o">Warn</em></div>
+          <div class="m-row"><span class="av a2">JT</span><div><b>Jordan T.</b><small>Spamming</small></div><em class="tag r">Timeout</em></div>
+          <div class="m-row"><span class="av a3">AL</span><div><b>Alex L.</b><small>Posted a blocked link</small></div><em class="tag o">Warn</em></div>
+          <div class="m-row"><span class="av a4">SR</span><div><b>Sam R.</b><small>Mass mentions</small></div><em class="tag o">Warn</em></div>
+        </div>
+      </div>
+
+      <div class="float f-note">
+        <b>Auto-mod caught a message</b>
+        <p>A banned word was removed and the member was warned.</p>
+        <span class="line"></span><span class="line short"></span>
+      </div>
+      <div class="float f-confirm">
+        <span class="av a2">JT</span>
+        <div><b>Time out Jordan T.?</b><small>10 minutes · Spamming</small></div>
+        <span class="mini ghost">Cancel</span><span class="mini">Confirm</span>
+      </div>
+      <div class="float f-menu"><span class="on">All</span><span>Warnings</span><span>Timeouts</span><span>Bans</span></div>
+      <svg class="cube" viewBox="0 0 64 64"><path d="M32 6l22 12v26L32 58 10 44V18z" fill="#ff8a3d"/><path d="M32 6l22 12-22 12L10 18z" fill="#ffb27a"/><path d="M32 30v28L10 44V18z" fill="#f2691a"/></svg>
+    </div>
+  </section>
+
+  <section id="features" class="section">
+    <h2>Everything a mod team needs</h2>
+    <p class="lead">Set it up once. ModBot handles the boring parts and keeps a record of everything.</p>
+    <div class="grid">
+      <article class="tile"><span class="ic">🛡️</span><h3>Auto-mod</h3><p>Filters for banned words, spam, mass mentions and unwanted links. Moderators are exempt.</p></article>
+      <article class="tile"><span class="ic">⚠️</span><h3>Warnings that escalate</h3><p>Set how many warnings lead to a timeout, and for how long. It happens automatically.</p></article>
+      <article class="tile"><span class="ic">🖥️</span><h3>A real dashboard</h3><p>Log in with Yapin’ to warn, time out, ban, edit settings and review activity from your browser.</p></article>
+      <article class="tile"><span class="ic">🔎</span><h3>Member lookup</h3><p>See any member’s roles, warnings, private notes and history on one page.</p></article>
+      <article class="tile"><span class="ic">📝</span><h3>Mod log and notes</h3><p>Send actions to a log channel and leave private notes for the rest of your team.</p></article>
+      <article class="tile"><span class="ic">⏱️</span><h3>Always on</h3><p>The bot restarts itself if it drops, and a Status page shows its health at a glance.</p></article>
+    </div>
+  </section>
+
+  <section id="how" class="section">
+    <h2>Up and running in three steps</h2>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h3>Add the bot</h3><p>Add ModBot to your Yapper server and send a message so it can see the server.</p></div>
+      <div class="step"><span class="n">2</span><h3>Log in</h3><p>Use <b>Login with Yapin’</b>. Server managers get full control, moderators get warn and timeout tools.</p></div>
+      <div class="step"><span class="n">3</span><h3>Choose your rules</h3><p>Switch filters on, add banned words, set the escalation steps and a mod-log channel.</p></div>
+    </div>
+  </section>
+
+  <section id="commands" class="section">
+    <h2>Prefer typing? There are commands</h2>
+    <p class="lead">Type <code>!help</code> in your server to see what you can use.</p>
+    <div class="cmds">
+      <div class="cmd"><h3>Everyone</h3><code>!help</code><code>!rules</code><code>!mywarnings</code><code>!userinfo</code><code>!roll</code><code>!choose a | b</code></div>
+      <div class="cmd"><h3>Moderators</h3><code>!warn</code><code>!timeout</code><code>!unwarn</code><code>!history</code><code>!note</code><code>!topwarned</code><code>!stats</code></div>
+      <div class="cmd"><h3>Managers</h3><code>!ban</code><code>!unban</code><code>!addword</code><code>!filter</code><code>!escalate</code><code>!setrules</code><code>!setlog</code></div>
+    </div>
+  </section>
+
+  <section class="section final">
+    <h2>Ready to give your mods a break?</h2>
+    <p class="lead">Log in with your Yapin’ account to get started.</p>
+    <a class="btn big" href="/auth/login">Login with Yapin’</a>
+  </section>
+</main>
+
+<footer><span>Yapper ModBot</span><span><a href="/dashboard">Dashboard</a> · <a href="#features">Features</a> · <a href="#commands">Commands</a></span></footer>
+</body>
+</html>

@@ -382,7 +382,9 @@ async function route(req, url, user) {
 
 // ---------------------------------------------------------------- http plumbing
 const STATIC = {
-  "/": ["index.html", "text/html; charset=utf-8"],
+  "/": ["landing.html", "text/html; charset=utf-8"],
+  "/dashboard": ["index.html", "text/html; charset=utf-8"],
+  "/landing.css": ["landing.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/style.css": ["style.css", "text/css; charset=utf-8"],
   "/favicon.svg": ["favicon.svg", "image/svg+xml"],
@@ -435,7 +437,7 @@ async function handle(req, res) {
   if (req.method === "GET" && p === "/auth/callback") {
     if (limited(req, "auth", 30)) return send(res, 429, "Too many attempts, try again in a minute.");
     const clear = cookie("ym_state", "", 0);
-    const fail = (why) => send(res, 302, "", { Location: `/?login_error=${encodeURIComponent(why)}`, "Set-Cookie": clear });
+    const fail = (why) => send(res, 302, "", { Location: `/dashboard?login_error=${encodeURIComponent(why)}`, "Set-Cookie": clear });
     if (url.searchParams.get("error")) return fail("Login was cancelled.");
     const want = parseCookies(req).ym_state;
     const got = url.searchParams.get("state");
@@ -444,7 +446,7 @@ async function handle(req, res) {
       const token = await exchangeCode(url.searchParams.get("code") ?? "");
       const u = await fetchIdentity(token);
       console.log(ts(), `Dashboard login: ${u.username} (${u.id})`);
-      return send(res, 302, "", { Location: "/", "Set-Cookie": [clear, cookie("ym_session", makeSession(u), SESSION_DAYS * 86400)] });
+      return send(res, 302, "", { Location: "/dashboard", "Set-Cookie": [clear, cookie("ym_session", makeSession(u), SESSION_DAYS * 86400)] });
     } catch (e) {
       console.error(ts(), "ERROR login failed:", e.message);
       return fail("Couldn't finish logging in. Please try again.");

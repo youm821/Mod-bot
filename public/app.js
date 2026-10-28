@@ -66,7 +66,7 @@ function sparkline(vals) {
   const pts = vals.map((v, i) => [(i / (vals.length - 1)) * (w - 6) + 3, hgt - 4 - (v / max) * (hgt - 10)]);
   const p = document.createElementNS(ns, "path");
   p.setAttribute("d", pts.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" "));
-  p.setAttribute("fill", "none"); p.setAttribute("stroke", "#e8c27a"); p.setAttribute("stroke-width", "2.2"); p.setAttribute("stroke-linecap", "round"); p.setAttribute("stroke-linejoin", "round");
+  p.setAttribute("fill", "none"); p.setAttribute("stroke", "currentColor"); p.setAttribute("stroke-width", "2.2"); p.setAttribute("stroke-linecap", "round"); p.setAttribute("stroke-linejoin", "round");
   svg.append(p); return svg;
 }
 function perDay(entries, days, filter = () => true) {
